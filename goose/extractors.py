@@ -22,14 +22,14 @@ limitations under the License.
 """
 import re
 from copy import deepcopy
-from urlparse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin
 from goose.utils import StringSplitter
 from goose.utils import StringReplacement
 from goose.utils import ReplaceSequence
 
 MOTLEY_REPLACEMENT = StringReplacement("&#65533;", "")
-ESCAPED_FRAGMENT_REPLACEMENT = StringReplacement(u"#!", u"?_escaped_fragment_=")
-TITLE_REPLACEMENTS = ReplaceSequence().create(u"&raquo;").append(u"»")
+ESCAPED_FRAGMENT_REPLACEMENT = StringReplacement("#!", "?_escaped_fragment_=")
+TITLE_REPLACEMENTS = ReplaceSequence().create("&raquo;").append("»")
 PIPE_SPLITTER = StringSplitter("\\|")
 DASH_SPLITTER = StringSplitter(" - ")
 ARROWS_SPLITTER = StringSplitter("»")
@@ -90,7 +90,7 @@ class ContentExtractor(object):
             used_delimeter = True
 
         # split title with »
-        if not used_delimeter and u'»' in title_text:
+        if not used_delimeter and '»' in title_text:
             title_text = self.split_title(title_text, ARROWS_SPLITTER)
             used_delimeter = True
 
@@ -287,7 +287,7 @@ class ContentExtractor(object):
             parent_parent_node = self.parser.getParent(parent_node)
             if parent_parent_node is not None:
                 self.update_node_count(parent_parent_node, 1)
-                self.update_score(parent_parent_node, upscore / 2)
+                self.update_score(parent_parent_node, upscore // 2)
                 if parent_parent_node not in parent_nodes:
                     parent_nodes.append(parent_parent_node)
             cnt += 1
@@ -494,7 +494,7 @@ class ContentExtractor(object):
                 self.parser.remove(p)
 
         subParagraphs2 = self.parser.getElementsByTag(e, tag='p')
-        if len(subParagraphs2) == 0 and e.tag is not "td":
+        if len(subParagraphs2) == 0 and e.tag != "td":
             return True
         return False
 
