@@ -22,7 +22,7 @@ limitations under the License.
 """
 import re
 import os
-from urlparse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin
 from goose.utils import FileHelper
 from goose.images.image import Image
 from goose.images.utils import ImageUtils
@@ -358,7 +358,7 @@ class UpgradedImageIExtractor(ImageExtractor):
           are on specific sites
         """
         domain = self.get_clean_domain()
-        if domain in self.custom_site_mapping.keys():
+        if domain in self.custom_site_mapping:
             classes = self.custom_site_mapping.get(domain).split('|')
             for classname in classes:
                 KNOWN_IMG_DOM_NAMES.append(classname)
