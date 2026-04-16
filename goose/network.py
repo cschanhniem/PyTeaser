@@ -20,8 +20,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
-import urllib2
-import cookielib
+from http.cookiejar import CookieJar
+from urllib.error import HTTPError, URLError
+from urllib.request import HTTPCookieProcessor, Request, build_opener
 
 class HtmlFetcher(object):
 
@@ -35,19 +36,16 @@ class HtmlFetcher(object):
         """\
 
         """
-        if isinstance(url, unicode):
-            url = url.encode('utf-8')
+        if isinstance(url, bytes):
+            url = url.decode('utf-8')
         
-        cookiejar = cookielib.LWPCookieJar()
-        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookiejar))
-        urllib2.install_opener(opener)
+        opener = build_opener(HTTPCookieProcessor(CookieJar()))
 
         headers = {'User-agent': config.browser_user_agent}
-        request = urllib2.Request(url, headers=headers)
+        request = Request(url, headers=headers)
 
         try:
-            result = urllib2.urlopen(request).read()
-        except:
+            with opener.open(request) as response:
+                return response.read()
+        except (HTTPError, URLError, OSError, ValueError):
             return None
-
-        return result
