@@ -28,12 +28,10 @@ import re
 import string
 from goose.utils import FileHelper
 from goose.utils.encoding import smart_unicode
-from goose.utils.encoding import smart_str
-from goose.utils.encoding import DjangoUnicodeDecodeError
 TABSSPACE = re.compile(r'[\s\t]+')
 
 def innerTrim(value):
-    if isinstance(value, (unicode, str)):
+    if isinstance(value, str):
         # remove tab and white space
         value = re.sub(TABSSPACE, ' ', value)
         value = ''.join(value.splitlines())
@@ -42,14 +40,7 @@ def innerTrim(value):
 
 
 def encodeValue(value):
-    string_org = value
-    try:
-        value = smart_unicode(value)
-    except (UnicodeEncodeError, DjangoUnicodeDecodeError):
-        value = smart_str(value)
-    except:
-        value = string_org
-    return value
+    return smart_unicode(value, errors='replace')
 
 
 class WordStats(object):
@@ -87,8 +78,8 @@ class WordStats(object):
 
 class StopWords(object):
 
-    PUNCTUATION = re.compile("[^\\p{Ll}\\p{Lu}\\p{Lt}\\p{Lo}\\p{Nd}\\p{Pc}\\s]")
-    TRANS_TABLE = string.maketrans('', '')
+    PUNCTUATION = re.compile(r"[^\w\s]", re.UNICODE)
+    TRANS_TABLE = str.maketrans('', '', string.punctuation)
     _cached_stop_words = {}
 
     def __init__(self, language='en'):
@@ -100,11 +91,9 @@ class StopWords(object):
         self.STOP_WORDS = self._cached_stop_words[language]
 
     def remove_punctuation(self, content):
-        # code taken form
-        # http://stackoverflow.com/questions/265960/best-way-to-strip-punctuation-from-a-string-in-python
-        if isinstance(content, unicode):
-            content = content.encode('utf-8')
-        return content.translate(self.TRANS_TABLE, string.punctuation).decode('utf-8')
+        if isinstance(content, bytes):
+            content = content.decode('utf-8', 'replace')
+        return self.PUNCTUATION.sub('', content)
 
     def candiate_words(self, stripped_input):
         return stripped_input.split(' ')
