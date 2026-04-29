@@ -25,8 +25,7 @@ import hashlib
 import re
 import os
 import goose
-import codecs
-import urlparse
+import urllib.parse as urlparse
 
 
 class BuildURL(object):
@@ -36,7 +35,7 @@ class BuildURL(object):
 
     def getHostname(self, o):
         if o.hostname:
-            return o.hotname
+            return o.hostname
         elif self.finalurl:
             oo = urlparse(self.finalurl)
             if oo.hostname:
@@ -65,15 +64,14 @@ class FileHelper(object):
 
     @classmethod
     def loadResourceFile(self, filename):
-        if not os.path.isabs('filename'):
+        if not os.path.isabs(filename):
             dirpath = os.path.dirname(goose.__file__)
             path = os.path.join(dirpath, 'resources', filename)
         else:
             path = filename
         try:
-            f = codecs.open(path, 'r', 'utf-8')
-            content = f.read()
-            f.close()
+            with open(path, 'r', encoding='utf-8') as f:
+                content = f.read()
             return content
         except IOError:
             raise IOError("Couldn't open file %s" % path)
@@ -89,7 +87,7 @@ class ParsingCandidate(object):
 class RawHelper(object):
     @classmethod
     def get_parsing_candidate(self, url, raw_html):
-        if isinstance(raw_html, unicode):
+        if isinstance(raw_html, str):
             raw_html = raw_html.encode('utf-8')
         link_hash = '%s.%s' % (hashlib.md5(raw_html).hexdigest(), time.time())
         return ParsingCandidate(url, link_hash)
@@ -101,7 +99,8 @@ class URLHelper(object):
         # replace shebang is urls
         final_url = url_to_crawl.replace('#!', '?_escaped_fragment_=') \
                     if '#!' in url_to_crawl else url_to_crawl
-        link_hash = '%s.%s' % (hashlib.md5(final_url).hexdigest(), time.time())
+        link_hash = '%s.%s' % (
+            hashlib.md5(final_url.encode('utf-8')).hexdigest(), time.time())
         return ParsingCandidate(final_url, link_hash)
 
 
@@ -126,7 +125,7 @@ class StringReplacement(object):
 
     def replaceAll(self, string):
         if not string:
-            return u''
+            return ''
         return string.replace(self.pattern, self.replaceWith)
 
 
@@ -137,7 +136,7 @@ class ReplaceSequence(object):
 
     #@classmethod
     def create(self, firstPattern, replaceWith=None):
-        result = StringReplacement(firstPattern, replaceWith or u'')
+        result = StringReplacement(firstPattern, replaceWith or '')
         self.replacements.append(result)
         return self
 
@@ -146,7 +145,7 @@ class ReplaceSequence(object):
 
     def replaceAll(self, string):
         if not string:
-            return u''
+            return ''
 
         mutatedString = string
 
