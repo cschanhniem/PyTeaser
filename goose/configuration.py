@@ -70,6 +70,12 @@ class Configuration(object):
         #                         "Version/5.1.2 Safari/534.52.7"
         self.browser_user_agent = 'Goose/%s' % __version__
 
+        # Network safety and resource limits for article/image downloads.
+        self.request_timeout = 10.0
+        self.max_html_bytes = 5 * 1024 * 1024
+        self.max_image_bytes = 15 * 1024 * 1024
+        self.allow_private_network = False
+
         # debug mode
         # enable this to have additional debugging information
         # sent to stdout
