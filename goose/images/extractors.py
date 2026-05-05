@@ -176,6 +176,8 @@ class UpgradedImageIExtractor(ImageExtractor):
             src = self.parser.getAttribute(image, attr='src')
             src = self.build_image_path(src)
             local_image = self.get_local_image(src)
+            if local_image is None:
+                continue
             width = local_image.width
             height = local_image.height
             src = local_image.src
@@ -291,19 +293,18 @@ class UpgradedImageIExtractor(ImageExtractor):
         MAX_BYTES_SIZE = 15728640
         good_images = []
         for image in images:
-            if cnt > 30:
+            if cnt >= 30:
                 return good_images
+            cnt += 1
             src = self.parser.getAttribute(image, attr='src')
             src = self.build_image_path(src)
             local_image = self.get_local_image(src)
-            if local_image:
-                bytes = local_image.bytes
-                if (bytes == 0 or bytes > self.images_min_bytes) \
-                        and bytes < MAX_BYTES_SIZE:
-                    good_images.append(image)
-                else:
-                    images.remove(image)
-            cnt += 1
+            if local_image is None:
+                continue
+            bytes = local_image.bytes
+            if (bytes == 0 or bytes > self.images_min_bytes) \
+                    and bytes < MAX_BYTES_SIZE:
+                good_images.append(image)
         return good_images if len(good_images) > 0 else None
 
     def get_node(self, node):
