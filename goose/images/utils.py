@@ -22,8 +22,12 @@ limitations under the License.
 """
 import hashlib
 import os
-from urllib.request import Request, urlopen
+from http.client import HTTPException
+from urllib.error import HTTPError, URLError
+
 from PIL import Image
+
+from goose.network import fetch_bytes
 from goose.utils.encoding import smart_str
 from goose.images.image import ImageDetails
 from goose.images.image import LocallyStoredImage
@@ -54,7 +58,7 @@ class ImageUtils(object):
             return image
 
         # no cache found download the image
-        data = self.fetch(http_client, src)
+        data = self.fetch(http_client, src, config)
         if data:
             image = self.write_localfile(data, link_hash, src, config)
             if image:
@@ -110,11 +114,13 @@ class ImageUtils(object):
         return src.replace(" ", "%20")
 
     @classmethod
-    def fetch(self, http_client, src):
+    def fetch(self, http_client, src, config):
         try:
-            req = Request(src)
-            f = urlopen(req)
-            data = f.read()
-            return data
-        except:
+            return fetch_bytes(
+                config,
+                src,
+                config.max_image_bytes,
+                accepted_content_types={"image/*"},
+            )
+        except (HTTPError, URLError, OSError, HTTPException, ValueError):
             return None
