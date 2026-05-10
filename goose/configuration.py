@@ -36,11 +36,9 @@ class Configuration(object):
         # in the beginning of the article
         self.images_min_bytes = 4500
 
-        # set this guy to false if you don't care about getting images,
-        # otherwise you can either use the default
-        # image extractor to implement the ImageExtractor
-        # interface to build your own
-        self.enable_image_fetching = True
+        # Image extraction is optional and disabled by default. Enable it
+        # explicitly when the caller needs article images.
+        self.enable_image_fetching = False
 
         # set this variable to False if you want to force
         # the article language. OtherWise it will attempt to
