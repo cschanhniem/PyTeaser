@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 from urllib.request import Request
 
 from goose import Goose
+from goose.crawler import Crawler
 from goose.network import HtmlFetcher
 from goose.network import (
     SafeRedirectHandler,
@@ -74,10 +75,23 @@ class TestGooseExtraction(TestCase):
           <p>This is another sufficiently long paragraph so the body can be recognized correctly by Goose.</p>
         </article></body></html>"""
 
-        article = Goose().extract(raw_html=html)
+        article = Goose({"enable_image_fetching": True}).extract(raw_html=html)
 
         self.assertEqual(article.title, "Image fetch test")
         self.assertIn("safe network handling", article.cleaned_text)
+
+    def test_image_fetching_is_disabled_by_default(self):
+        html = """<html><head><title>No image fetch</title></head><body><article>
+          <p>This is a sufficiently long paragraph about ordinary article extraction and summaries.</p>
+          <img src="https://1.1.1.1/image.jpg" alt="remote image">
+          <p>This second sufficiently long paragraph provides another useful extraction candidate.</p>
+        </article></body></html>"""
+
+        with patch.object(Crawler, "get_image_extractor") as get_image_extractor:
+            article = Goose().extract(raw_html=html)
+
+        get_image_extractor.assert_not_called()
+        self.assertEqual(article.title, "No image fetch")
 
 
 class TestNetworkPolicy(TestCase):
