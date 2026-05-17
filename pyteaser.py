@@ -80,7 +80,6 @@ def SummarizeUrl(url):
 
 
 def Summarize(title, text):
-    summaries = []
     sentences = split_sentences(text)
     keys = keywords(text)
     titleWords = split_words(title)
@@ -88,12 +87,14 @@ def Summarize(title, text):
     if len(sentences) <= 5:
         return sentences
 
-    #score sentences, and use the top 5 sentences
-    ranks = score(sentences, titleWords, keys).most_common(5)
-    for rank in ranks:
-        summaries.append(rank[0])
-
-    return summaries
+    # Rank each occurrence separately, select the best sentences, then restore
+    # the article's original order for a coherent extractive summary.
+    ranked = sorted(
+        score(sentences, titleWords, keys),
+        key=lambda result: (-result[2], result[0]),
+    )[:5]
+    ranked.sort(key=lambda result: result[0])
+    return [sentence for _, sentence, _ in ranked]
 
 
 def grab_link(inurl):
@@ -108,10 +109,9 @@ def grab_link(inurl):
 
 
 def score(sentences, titleWords, keywords):
-    #score sentences based on different features
-
+    """Return ``(index, sentence, score)`` for every sentence occurrence."""
     senSize = len(sentences)
-    ranks = Counter()
+    ranks = []
     for i, s in enumerate(sentences):
         sentence = split_words(s)
         titleFeature = title_score(titleWords, sentence)
@@ -124,7 +124,7 @@ def score(sentences, titleWords, keywords):
         #weighted average of scores from four categories
         totalScore = (titleFeature*1.5 + frequency*2.0 +
                       sentenceLength*1.0 + sentencePosition*1.0) / 4.0
-        ranks[s] = totalScore
+        ranks.append((i, s, totalScore))
     return ranks
 
 
