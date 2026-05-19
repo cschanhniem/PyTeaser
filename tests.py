@@ -19,7 +19,7 @@ from goose.network import (
     fetch_bytes,
     validate_url,
 )
-from pyteaser import Summarize, SummarizeUrl
+from pyteaser import Summarize, SummarizeUrl, score
 
 
 class TestSummarize(TestCase):
@@ -37,6 +37,30 @@ class TestSummarize(TestCase):
             Summarize(u"A short article.", u"First sentence. Second sentence."),
             [u"First sentence.", u"Second sentence."],
         )
+
+    def test_summary_restores_original_order_after_ranking(self):
+        sentences = ["Sentence %s." % index for index in range(6)]
+        ranked = [
+            (5, sentences[5], 10.0),
+            (1, sentences[1], 9.0),
+            (4, sentences[4], 8.0),
+            (2, sentences[2], 7.0),
+            (3, sentences[3], 6.0),
+            (0, sentences[0], 1.0),
+        ]
+
+        with patch("pyteaser.score", return_value=ranked):
+            summary = Summarize("An article", " ".join(sentences))
+
+        self.assertEqual(summary, sentences[1:])
+
+    def test_score_preserves_repeated_sentence_occurrences(self):
+        repeated = "Repeated sentence."
+
+        ranked = score([repeated, repeated], [], {})
+
+        self.assertEqual([result[0] for result in ranked], [0, 1])
+        self.assertEqual([result[1] for result in ranked], [repeated, repeated])
 
 
 class TestGooseExtraction(TestCase):
