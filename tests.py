@@ -38,6 +38,26 @@ class TestSummarize(TestCase):
             [u"First sentence.", u"Second sentence."],
         )
 
+    def test_blank_text_returns_empty_summary(self):
+        self.assertEqual(Summarize("Title", " \n\t "), [])
+
+    def test_missing_title_and_utf8_bytes_are_supported(self):
+        self.assertEqual(Summarize(None, "First sentence. Second sentence."), [
+            "First sentence.",
+            "Second sentence.",
+        ])
+        self.assertEqual(Summarize("Café".encode("utf-8"), "Café matters.".encode("utf-8")), [
+            "Café matters.",
+        ])
+
+    def test_unsupported_text_types_raise_clear_errors(self):
+        with self.assertRaisesRegex(TypeError, "text must be a string"):
+            Summarize("Title", None)
+        with self.assertRaisesRegex(TypeError, "text must be a string"):
+            Summarize("Title", 42)
+        with self.assertRaisesRegex(ValueError, "valid UTF-8"):
+            Summarize("Title", b"\xff")
+
     def test_summary_restores_original_order_after_ranking(self):
         sentences = ["Sentence %s." % index for index in range(6)]
         ranked = [
