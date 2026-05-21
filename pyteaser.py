@@ -80,7 +80,19 @@ def SummarizeUrl(url):
 
 
 def Summarize(title, text):
+    """Return an extractive summary for a title and article text.
+
+    Text arguments may be strings or UTF-8 encoded bytes. A missing title is
+    treated as an empty string; blank article text produces an empty summary.
+    """
+    title = _coerce_text(title, "title", allow_none=True)
+    text = _coerce_text(text, "text")
+    if not text.strip():
+        return []
+
     sentences = split_sentences(text)
+    if not sentences:
+        return []
     keys = keywords(text)
     titleWords = split_words(title)
 
@@ -95,6 +107,19 @@ def Summarize(title, text):
     )[:5]
     ranked.sort(key=lambda result: result[0])
     return [sentence for _, sentence, _ in ranked]
+
+
+def _coerce_text(value, name, allow_none=False):
+    if value is None and allow_none:
+        return ""
+    if isinstance(value, bytes):
+        try:
+            value = value.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise ValueError("%s must contain valid UTF-8" % name) from error
+    if not isinstance(value, str):
+        raise TypeError("%s must be a string or UTF-8 bytes" % name)
+    return value
 
 
 def grab_link(inurl):
@@ -164,11 +189,9 @@ def dbs(words, keywords):
 
 def split_words(text):
     #split a string into array of words
-    try:
-        text = regex_sub(r'[^\w ]', '', text, flags=REGEX_UNICODE)  # strip special chars
-        return [x.strip('.').lower() for x in text.split()]
-    except TypeError:
-        return None
+    text = _coerce_text(text, "text")
+    text = regex_sub(r'[^\w ]', '', text, flags=REGEX_UNICODE)  # strip special chars
+    return [x.strip('.').lower() for x in text.split()]
 
 
 def keywords(text):
@@ -201,6 +224,10 @@ def split_sentences(text):
     second to last line adds this item to the s_iter list and the last line returns the full list.
     '''
     
+    text = _coerce_text(text, "text")
+    if not text.strip():
+        return []
+
     sentences = regex_split(
         r'(?<![A-ZА-ЯЁ])([.!?]"?)(?=\s+"?[A-ZА-ЯЁ])',
         text,
