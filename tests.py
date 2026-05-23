@@ -58,6 +58,21 @@ class TestSummarize(TestCase):
         with self.assertRaisesRegex(ValueError, "valid UTF-8"):
             Summarize("Title", b"\xff")
 
+    def test_sentence_count_is_configurable(self):
+        text = "One sentence. Two sentence. Three sentence. Four sentence. Five sentence. Six sentence."
+
+        self.assertEqual(len(Summarize("Title", text)), 5)
+        self.assertEqual(len(Summarize("Title", text, sentence_count=2)), 2)
+        self.assertEqual(Summarize("Title", text, sentence_count=0), [])
+
+    def test_invalid_sentence_count_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "sentence_count"):
+            Summarize("Title", "Article text.", sentence_count=-1)
+        with self.assertRaisesRegex(TypeError, "sentence_count"):
+            Summarize("Title", "Article text.", sentence_count=1.5)
+        with self.assertRaisesRegex(TypeError, "sentence_count"):
+            Summarize("Title", "Article text.", sentence_count=True)
+
     def test_summary_restores_original_order_after_ranking(self):
         sentences = ["Sentence %s." % index for index in range(6)]
         ranked = [
@@ -111,6 +126,17 @@ class TestGooseExtraction(TestCase):
 
         self.assertEqual(len(summaries), 5)
         self.assertTrue(all(isinstance(sentence, str) for sentence in summaries))
+
+    def test_summarize_url_honors_sentence_count(self):
+        html = b"""<html lang="en"><head><title>Example article title</title></head>
+        <body><article><p>One sentence is here. Two sentence is here. Three sentence is here.
+        Four sentence is here. Five sentence is here. Six sentence is here.</p></article></body></html>"""
+
+        with patch.object(HtmlFetcher, "get_html", return_value=html):
+            summaries = SummarizeUrl(
+                "https://example.test/article", sentence_count=2)
+
+        self.assertEqual(len(summaries), 2)
 
     def test_private_image_url_is_skipped_without_failing_extraction(self):
         html = """<html><head><title>Image fetch test</title></head><body><article>
