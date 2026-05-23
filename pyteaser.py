@@ -64,7 +64,8 @@ stopWords = set([
 ideal = 20.0
 
 
-def SummarizeUrl(url):
+def SummarizeUrl(url, sentence_count=5):
+    sentence_count = _validate_sentence_count(sentence_count)
     summaries = []
     try:
         article = grab_link(url)
@@ -74,20 +75,23 @@ def SummarizeUrl(url):
     if not (article and article.cleaned_text and article.title):
         return None
 
-    summaries = Summarize(str(article.title),
-                          str(article.cleaned_text))
+    summaries = Summarize(
+        str(article.title), str(article.cleaned_text), sentence_count)
     return summaries
 
 
-def Summarize(title, text):
+def Summarize(title, text, sentence_count=5):
     """Return an extractive summary for a title and article text.
 
     Text arguments may be strings or UTF-8 encoded bytes. A missing title is
     treated as an empty string; blank article text produces an empty summary.
     """
+    sentence_count = _validate_sentence_count(sentence_count)
     title = _coerce_text(title, "title", allow_none=True)
     text = _coerce_text(text, "text")
     if not text.strip():
+        return []
+    if sentence_count == 0:
         return []
 
     sentences = split_sentences(text)
@@ -96,7 +100,7 @@ def Summarize(title, text):
     keys = keywords(text)
     titleWords = split_words(title)
 
-    if len(sentences) <= 5:
+    if len(sentences) <= sentence_count:
         return sentences
 
     # Rank each occurrence separately, select the best sentences, then restore
@@ -104,7 +108,7 @@ def Summarize(title, text):
     ranked = sorted(
         score(sentences, titleWords, keys),
         key=lambda result: (-result[2], result[0]),
-    )[:5]
+    )[:sentence_count]
     ranked.sort(key=lambda result: result[0])
     return [sentence for _, sentence, _ in ranked]
 
@@ -120,6 +124,14 @@ def _coerce_text(value, name, allow_none=False):
     if not isinstance(value, str):
         raise TypeError("%s must be a string or UTF-8 bytes" % name)
     return value
+
+
+def _validate_sentence_count(sentence_count):
+    if isinstance(sentence_count, bool) or not isinstance(sentence_count, int):
+        raise TypeError("sentence_count must be a non-negative integer")
+    if sentence_count < 0:
+        raise ValueError("sentence_count must be a non-negative integer")
+    return sentence_count
 
 
 def grab_link(inurl):
