@@ -104,7 +104,14 @@ class TestSummarize(TestCase):
         )
 
     def test_summary_restores_original_order_after_ranking(self):
-        sentences = ["Sentence %s." % index for index in range(6)]
+        sentences = [
+            "Alpha begins today.",
+            "Bravo announces plans.",
+            "Charlie discovers evidence.",
+            "Delta publishes results.",
+            "Echo reports success.",
+            "Foxtrot reveals details.",
+        ]
         ranked = [
             (5, sentences[5], 10.0),
             (1, sentences[1], 9.0),
@@ -118,6 +125,34 @@ class TestSummarize(TestCase):
             summary = Summarize("An article", " ".join(sentences))
 
         self.assertEqual(summary, sentences[1:])
+
+    def test_summary_skips_redundant_sentences(self):
+        sentences = [
+            "Researchers confirmed several new findings.",
+            "Researchers confirmed several new findings.",
+            "The final report described four separate outcomes.",
+            "Independent experts reviewed the published evidence.",
+        ]
+        ranked = [
+            (0, sentences[0], 10.0),
+            (1, sentences[1], 9.0),
+            (3, sentences[3], 8.0),
+            (2, sentences[2], 7.0),
+        ]
+
+        with patch("pyteaser.score", return_value=ranked):
+            summary = Summarize("An article", " ".join(sentences), sentence_count=3)
+
+        self.assertEqual(summary, [sentences[0], sentences[2], sentences[3]])
+
+    def test_short_article_does_not_repeat_duplicate_sentences(self):
+        self.assertEqual(
+            Summarize(
+                "A short article",
+                "Researchers confirmed several findings. Researchers confirmed several findings.",
+            ),
+            ["Researchers confirmed several findings."],
+        )
 
     def test_score_preserves_repeated_sentence_occurrences(self):
         repeated = "Repeated sentence."
