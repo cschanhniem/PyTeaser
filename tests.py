@@ -19,7 +19,7 @@ from goose.network import (
     fetch_bytes,
     validate_url,
 )
-from pyteaser import Summarize, SummarizeUrl, score
+from pyteaser import Summarize, SummarizeUrl, score, split_sentences
 
 
 class TestSummarize(TestCase):
@@ -72,6 +72,36 @@ class TestSummarize(TestCase):
             Summarize("Title", "Article text.", sentence_count=1.5)
         with self.assertRaisesRegex(TypeError, "sentence_count"):
             Summarize("Title", "Article text.", sentence_count=True)
+
+    def test_sentence_splitter_handles_lowercase_starts_and_quotes(self):
+        self.assertEqual(
+            split_sentences("First ends. lowercase follows! “Quoted?” yes."),
+            ["First ends.", "lowercase follows!", "“Quoted?”", "yes."],
+        )
+
+    def test_sentence_splitter_handles_abbreviations_and_decimals(self):
+        self.assertEqual(
+            split_sentences(
+                "Dr. Smith paid 3.14 dollars. The U.S. team met at 5 p.m. It continued."
+            ),
+            [
+                "Dr. Smith paid 3.14 dollars.",
+                "The U.S. team met at 5 p.m.",
+                "It continued.",
+            ],
+        )
+
+    def test_sentence_splitter_keeps_number_abbreviations_together(self):
+        self.assertEqual(
+            split_sentences("She chose No. 3. It worked."),
+            ["She chose No. 3.", "It worked."],
+        )
+
+    def test_sentence_splitter_handles_paragraphs_and_cjk_punctuation(self):
+        self.assertEqual(
+            split_sentences("First paragraph\n\n这是第一句。这是第二句！"),
+            ["First paragraph", "这是第一句。", "这是第二句！"],
+        )
 
     def test_summary_restores_original_order_after_ranking(self):
         sentences = ["Sentence %s." % index for index in range(6)]
