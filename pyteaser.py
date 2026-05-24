@@ -1,7 +1,7 @@
 # coding=utf-8
 from collections import Counter
 from math import fabs
-from re import split as regex_split, sub as regex_sub, UNICODE as REGEX_UNICODE
+from re import search as regex_search, sub as regex_sub, UNICODE as REGEX_UNICODE
 
 stopWords = set([
     "-", " ", ",", ".", "a", "e", "i", "o", "u", "t", "about", "above",
@@ -62,6 +62,18 @@ stopWords = set([
     "government", "police"
 ])
 ideal = 20.0
+_SENTENCE_PUNCTUATION = ".!?。！？؟।"
+_CLOSING_PUNCTUATION = "\"'”’»)]}"
+_NO_SPACE_SENTENCE_PUNCTUATION = "!?。！？؟।"
+_TITLE_ABBREVIATIONS = {
+    "dr", "mr", "mrs", "ms", "prof", "rev", "sr", "jr", "st",
+}
+_NONTERMINAL_ABBREVIATIONS = {"e.g", "i.e", "n.b"}
+_CONTEXTUAL_ABBREVIATIONS = {
+    "a.m", "p.m", "u.s", "u.k", "u.n", "etc", "vs", "inc", "ltd",
+    "corp", "co", "approx", "fig", "no", "vol", "jan", "feb", "mar",
+    "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
+}
 
 
 def SummarizeUrl(url, sentence_count=5):
@@ -226,29 +238,86 @@ def keywords(text):
 
 
 def split_sentences(text):
-    '''
-    The regular expression matches all sentence ending punctuation and splits the string at those points.
-    At this point in the code, the list looks like this ["Hello, world", "!" ... ]. The punctuation and all quotation marks
-    are separated from the actual text. The first s_iter line turns each group of two items in the list into a tuple,
-    excluding the last item in the list (the last item in the list does not need to have this performed on it). Then,
-    the second s_iter line combines each tuple in the list into a single item and removes any whitespace at the beginning
-    of the line. Now, the s_iter list is formatted correctly but it is missing the last item of the sentences list. The
-    second to last line adds this item to the s_iter list and the last line returns the full list.
-    '''
-    
+    """Split text into sentences while preserving punctuation and source order."""
     text = _coerce_text(text, "text")
     if not text.strip():
         return []
 
-    sentences = regex_split(
-        r'(?<![A-ZА-ЯЁ])([.!?]"?)(?=\s+"?[A-ZА-ЯЁ])',
-        text,
+    sentences = []
+    paragraphs = regex_sub(r"\n\s*\n+", "\n\n", text.strip()).split("\n\n")
+    for paragraph in paragraphs:
+        paragraph = regex_sub(r"\s+", " ", paragraph, flags=REGEX_UNICODE).strip()
+        if not paragraph:
+            continue
+
+        start = 0
+        index = 0
+        while index < len(paragraph):
+            if paragraph[index] not in _SENTENCE_PUNCTUATION:
+                index += 1
+                continue
+
+            punctuation_start = index
+            while (index < len(paragraph)
+                   and paragraph[index] in _SENTENCE_PUNCTUATION):
+                index += 1
+            punctuation_end = index
+            while (index < len(paragraph)
+                   and paragraph[index] in _CLOSING_PUNCTUATION):
+                index += 1
+
+            punctuation = paragraph[punctuation_start:punctuation_end]
+            at_end = index == len(paragraph)
+            has_whitespace = not at_end and paragraph[index].isspace()
+            no_space_boundary = any(
+                mark in punctuation for mark in _NO_SPACE_SENTENCE_PUNCTUATION)
+            if not (at_end or has_whitespace or no_space_boundary):
+                continue
+
+            if ("." in punctuation
+                    and not no_space_boundary
+                    and not _should_split_after_period(
+                        paragraph, punctuation_start, index)):
+                continue
+
+            sentence = paragraph[start:index].strip()
+            if sentence:
+                sentences.append(sentence)
+            start = index
+            while start < len(paragraph) and paragraph[start].isspace():
+                start += 1
+            index = start
+
+        trailing_text = paragraph[start:].strip()
+        if trailing_text:
+            sentences.append(trailing_text)
+
+    return sentences
+
+
+def _should_split_after_period(text, punctuation_start, boundary_end):
+    match = regex_search(
+        r"([^\W_]+(?:\.[^\W_]+)*)$",
+        text[:punctuation_start],
         flags=REGEX_UNICODE,
     )
-    s_iter = zip(*[iter(sentences[:-1])] * 2)
-    s_iter = [''.join(map(str, y)).strip() for y in s_iter]
-    s_iter.append(sentences[-1].strip())
-    return s_iter
+    if not match:
+        return True
+
+    abbreviation = match.group(1).casefold()
+    if abbreviation in _TITLE_ABBREVIATIONS | _NONTERMINAL_ABBREVIATIONS:
+        return False
+
+    next_word = regex_search(
+        r"\w+", text[boundary_end:], flags=REGEX_UNICODE)
+    next_initial = next_word.group(0)[0] if next_word else ""
+    if abbreviation in _CONTEXTUAL_ABBREVIATIONS:
+        return not next_initial or next_initial.isupper()
+
+    if (len(abbreviation) == 1 and abbreviation.isalpha()
+            and next_initial.isupper()):
+        return False
+    return True
 
 
 
