@@ -112,17 +112,15 @@ def Summarize(title, text, sentence_count=5):
     keys = keywords(text)
     titleWords = split_words(title)
 
-    if len(sentences) <= sentence_count:
-        return sentences
-
     # Rank each occurrence separately, select the best sentences, then restore
     # the article's original order for a coherent extractive summary.
     ranked = sorted(
         score(sentences, titleWords, keys),
         key=lambda result: (-result[2], result[0]),
-    )[:sentence_count]
-    ranked.sort(key=lambda result: result[0])
-    return [sentence for _, sentence, _ in ranked]
+    )
+    selected = _select_non_redundant(ranked, sentence_count)
+    selected.sort(key=lambda result: result[0])
+    return [sentence for _, sentence, _ in selected]
 
 
 def _coerce_text(value, name, allow_none=False):
@@ -144,6 +142,43 @@ def _validate_sentence_count(sentence_count):
     if sentence_count < 0:
         raise ValueError("sentence_count must be a non-negative integer")
     return sentence_count
+
+
+def _select_non_redundant(ranked, sentence_count, threshold=0.8):
+    """Select high-ranked sentences while avoiding excessive word overlap."""
+    selected = []
+    selected_terms = []
+    selected_text = set()
+    for candidate in ranked:
+        words = split_words(candidate[1])
+        normalized_text = " ".join(words) or candidate[1].strip().casefold()
+        if normalized_text in selected_text:
+            continue
+
+        terms = set(words)
+        content_terms = terms.difference(stopWords)
+        if content_terms:
+            terms = content_terms
+
+        if (len(terms) >= 3 and any(
+                len(existing) >= 3
+                and _jaccard_similarity(terms, existing) >= threshold
+                for existing in selected_terms)):
+            continue
+
+        selected.append(candidate)
+        selected_terms.append(terms)
+        selected_text.add(normalized_text)
+        if len(selected) == sentence_count:
+            break
+    return selected
+
+
+def _jaccard_similarity(left, right):
+    union = left | right
+    if not union:
+        return 1.0
+    return len(left & right) / float(len(union))
 
 
 def grab_link(inurl):
