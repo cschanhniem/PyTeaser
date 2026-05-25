@@ -49,17 +49,14 @@ stopWords = set([
     "whereby", "wherein", "whereupon", "wherever", "whether", "which",
     "while", "whither", "who", "whoever", "whole", "whom", "whose",
     "why", "will", "with", "within", "without", "would", "yet", "you",
-    "your", "yours", "yourself", "yourselves", "the", "reuters", "news",
+    "your", "yours", "yourself", "yourselves", "the",
     "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
     "sunday", "mon", "tue", "wed", "thu", "fri", "sat", "sun",
-    "rappler", "rapplercom", "inquirer", "yahoo", "home", "sports",
-    "1", "10", "2012", "sa", "says", "tweet", "pm", "home", "homepage",
-    "sports", "section", "newsinfo", "stories", "story", "photo",
+    "1", "10", "2012", "sa", "says", "pm",
     "2013", "na", "ng", "ang", "year", "years", "percent", "ko", "ako",
     "yung", "yun", "2", "3", "4", "5", "6", "7", "8", "9", "0", "time",
     "january", "february", "march", "april", "may", "june", "july",
     "august", "september", "october", "november", "december",
-    "government", "police"
 ])
 ideal = 20.0
 _SENTENCE_PUNCTUATION = ".!?。！？؟।"
