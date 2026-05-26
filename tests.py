@@ -19,7 +19,7 @@ from goose.network import (
     fetch_bytes,
     validate_url,
 )
-from pyteaser import Summarize, SummarizeUrl, score, split_sentences
+from pyteaser import Summarize, SummarizeUrl, keywords, score, split_sentences, stopWords
 
 
 class TestSummarize(TestCase):
@@ -153,6 +153,14 @@ class TestSummarize(TestCase):
             ),
             ["Researchers confirmed several findings."],
         )
+
+    def test_topic_words_are_not_filtered_as_stopwords(self):
+        self.assertNotIn("government", stopWords)
+        self.assertNotIn("police", stopWords)
+        self.assertNotIn("reuters", stopWords)
+        self.assertNotIn("rappler", stopWords)
+        self.assertIn("government", keywords("Government police"))
+        self.assertIn("police", keywords("Government police"))
 
     def test_score_preserves_repeated_sentence_occurrences(self):
         repeated = "Repeated sentence."
