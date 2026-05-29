@@ -59,6 +59,10 @@ stopWords = set([
     "august", "september", "october", "november", "december",
 ])
 ideal = 20.0
+TITLE_WEIGHT = 1.5
+FREQUENCY_WEIGHT = 2.0
+LENGTH_WEIGHT = 1.0
+POSITION_WEIGHT = 1.0
 _SENTENCE_PUNCTUATION = ".!?。！？؟।"
 _CLOSING_PUNCTUATION = "\"'”’»)]}"
 _NO_SPACE_SENTENCE_PUNCTUATION = "!?。！？؟।"
@@ -202,9 +206,14 @@ def score(sentences, titleWords, keywords):
         dbsFeature = dbs(sentence, keywords)
         frequency = (sbsFeature + dbsFeature) / 2.0 * 10.0
 
-        #weighted average of scores from four categories
-        totalScore = (titleFeature*1.5 + frequency*2.0 +
-                      sentenceLength*1.0 + sentencePosition*1.0) / 4.0
+        totalWeight = (
+            TITLE_WEIGHT + FREQUENCY_WEIGHT + LENGTH_WEIGHT + POSITION_WEIGHT)
+        totalScore = (
+            titleFeature * TITLE_WEIGHT
+            + frequency * FREQUENCY_WEIGHT
+            + sentenceLength * LENGTH_WEIGHT
+            + sentencePosition * POSITION_WEIGHT
+        ) / totalWeight
         ranks.append((i, s, totalScore))
     return ranks
 
@@ -354,20 +363,16 @@ def _should_split_after_period(text, punctuation_start, boundary_end):
 
 
 def length_score(sentence):
-    return 1 - fabs(ideal - len(sentence)) / ideal
+    return max(0.0, 1.0 - fabs(ideal - len(sentence)) / ideal)
 
 
 def title_score(title, sentence):
-    title = [x for x in title if x not in stopWords]
-    count = 0.0
-    for word in sentence:
-        if (word not in stopWords and word in title):
-            count += 1.0
-            
-    if len(title) == 0:
+    title_terms = {word for word in title if word not in stopWords}
+    if not title_terms:
         return 0.0
-        
-    return count/len(title)
+
+    sentence_terms = {word for word in sentence if word not in stopWords}
+    return len(title_terms.intersection(sentence_terms)) / float(len(title_terms))
 
 
 def sentence_position(i, size):
