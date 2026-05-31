@@ -19,7 +19,16 @@ from goose.network import (
     fetch_bytes,
     validate_url,
 )
-from pyteaser import Summarize, SummarizeUrl, keywords, score, split_sentences, stopWords
+from pyteaser import (
+    Summarize,
+    SummarizeUrl,
+    keywords,
+    length_score,
+    score,
+    split_sentences,
+    stopWords,
+    title_score,
+)
 
 
 class TestSummarize(TestCase):
@@ -161,6 +170,17 @@ class TestSummarize(TestCase):
         self.assertNotIn("rappler", stopWords)
         self.assertIn("government", keywords("Government police"))
         self.assertIn("police", keywords("Government police"))
+
+    def test_length_score_is_bounded(self):
+        self.assertEqual(length_score(["word"] * 20), 1.0)
+        self.assertEqual(length_score(["word"] * 40), 0.0)
+        self.assertEqual(length_score(["word"] * 100), 0.0)
+
+    def test_repeated_title_words_do_not_inflate_title_relevance(self):
+        self.assertEqual(
+            title_score(["government", "government"], ["government"] * 4),
+            1.0,
+        )
 
     def test_score_preserves_repeated_sentence_occurrences(self):
         repeated = "Repeated sentence."
