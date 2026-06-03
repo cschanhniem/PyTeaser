@@ -1,6 +1,7 @@
 # coding=utf-8
 from collections import Counter
 from math import fabs
+import os
 from re import search as regex_search, sub as regex_sub, UNICODE as REGEX_UNICODE
 
 stopWords = set([
@@ -58,6 +59,8 @@ stopWords = set([
     "january", "february", "march", "april", "may", "june", "july",
     "august", "september", "october", "november", "december",
 ])
+_SUPPORTED_LANGUAGES = {"ar", "de", "en", "es", "fr", "it", "ru", "sv", "zh"}
+_STOP_WORDS_CACHE = {"en": stopWords}
 ideal = 20.0
 TITLE_WEIGHT = 1.5
 FREQUENCY_WEIGHT = 2.0
@@ -77,8 +80,10 @@ _CONTEXTUAL_ABBREVIATIONS = {
 }
 
 
-def SummarizeUrl(url, sentence_count=5):
+def SummarizeUrl(url, sentence_count=5, language=None):
     sentence_count = _validate_sentence_count(sentence_count)
+    requested_language = (
+        _normalize_language(language) if language is not None else None)
     summaries = []
     try:
         article = grab_link(url)
@@ -88,18 +93,30 @@ def SummarizeUrl(url, sentence_count=5):
     if not (article and article.cleaned_text and article.title):
         return None
 
-    summaries = Summarize(
-        str(article.title), str(article.cleaned_text), sentence_count)
-    return summaries
+    if requested_language is None:
+        try:
+            requested_language = _normalize_language(article.meta_lang or "en")
+        except ValueError:
+            requested_language = "en"
+
+    return Summarize(
+        str(article.title),
+        str(article.cleaned_text),
+        sentence_count,
+        language=requested_language,
+    )
 
 
-def Summarize(title, text, sentence_count=5):
+def Summarize(title, text, sentence_count=5, language="en"):
     """Return an extractive summary for a title and article text.
 
     Text arguments may be strings or UTF-8 encoded bytes. A missing title is
     treated as an empty string; blank article text produces an empty summary.
+    ``language`` selects tokenization and bundled stopwords.
     """
     sentence_count = _validate_sentence_count(sentence_count)
+    language = _normalize_language(language)
+    active_stop_words = _load_stop_words(language)
     title = _coerce_text(title, "title", allow_none=True)
     text = _coerce_text(text, "text")
     if not text.strip():
@@ -110,16 +127,17 @@ def Summarize(title, text, sentence_count=5):
     sentences = split_sentences(text)
     if not sentences:
         return []
-    keys = keywords(text)
-    titleWords = split_words(title)
+    keys = keywords(text, language, active_stop_words)
+    titleWords = split_words(title, language)
 
     # Rank each occurrence separately, select the best sentences, then restore
     # the article's original order for a coherent extractive summary.
     ranked = sorted(
-        score(sentences, titleWords, keys),
+        score(sentences, titleWords, keys, language, active_stop_words),
         key=lambda result: (-result[2], result[0]),
     )
-    selected = _select_non_redundant(ranked, sentence_count)
+    selected = _select_non_redundant(
+        ranked, sentence_count, language=language, stop_words=active_stop_words)
     selected.sort(key=lambda result: result[0])
     return [sentence for _, sentence, _ in selected]
 
@@ -137,6 +155,40 @@ def _coerce_text(value, name, allow_none=False):
     return value
 
 
+def _normalize_language(language):
+    if language is None:
+        return "en"
+    language = _coerce_text(language, "language")
+    language = language.replace("_", "-").split("-", 1)[0].casefold()
+    if language not in _SUPPORTED_LANGUAGES:
+        raise ValueError("Unsupported language: %s" % language)
+    return language
+
+
+def _load_stop_words(language):
+    language = _normalize_language(language)
+    if language not in _STOP_WORDS_CACHE:
+        path = os.path.join(
+            os.path.dirname(__file__),
+            "goose",
+            "resources",
+            "text",
+            "stopwords-%s.txt" % language,
+        )
+        try:
+            with open(path, "r", encoding="utf-8") as resource:
+                _STOP_WORDS_CACHE[language] = {
+                    line.strip().casefold()
+                    for line in resource
+                    if line.strip() and not line.lstrip().startswith("#")
+                }
+        except OSError as error:
+            raise ValueError(
+                "Stopword resource is missing for language: %s" % language
+            ) from error
+    return _STOP_WORDS_CACHE[language]
+
+
 def _validate_sentence_count(sentence_count):
     if isinstance(sentence_count, bool) or not isinstance(sentence_count, int):
         raise TypeError("sentence_count must be a non-negative integer")
@@ -145,19 +197,22 @@ def _validate_sentence_count(sentence_count):
     return sentence_count
 
 
-def _select_non_redundant(ranked, sentence_count, threshold=0.8):
+def _select_non_redundant(
+        ranked, sentence_count, threshold=0.8, language="en", stop_words=None):
     """Select high-ranked sentences while avoiding excessive word overlap."""
+    if stop_words is None:
+        stop_words = _load_stop_words(language)
     selected = []
     selected_terms = []
     selected_text = set()
     for candidate in ranked:
-        words = split_words(candidate[1])
+        words = split_words(candidate[1], language)
         normalized_text = " ".join(words) or candidate[1].strip().casefold()
         if normalized_text in selected_text:
             continue
 
         terms = set(words)
-        content_terms = terms.difference(stopWords)
+        content_terms = terms.difference(stop_words)
         if content_terms:
             terms = content_terms
 
@@ -193,13 +248,15 @@ def grab_link(inurl):
     return None
 
 
-def score(sentences, titleWords, keywords):
+def score(sentences, titleWords, keywords, language="en", stop_words=None):
     """Return ``(index, sentence, score)`` for every sentence occurrence."""
+    if stop_words is None:
+        stop_words = _load_stop_words(language)
     senSize = len(sentences)
     ranks = []
     for i, s in enumerate(sentences):
-        sentence = split_words(s)
-        titleFeature = title_score(titleWords, sentence)
+        sentence = split_words(s, language)
+        titleFeature = title_score(titleWords, sentence, stop_words)
         sentenceLength = length_score(sentence)
         sentencePosition = sentence_position(i+1, senSize)
         sbsFeature = sbs(sentence, keywords)
@@ -252,21 +309,38 @@ def dbs(words, keywords):
     return (1/(k*(k+1.0))*summ)
 
 
-def split_words(text):
-    #split a string into array of words
+def split_words(text, language="en"):
+    """Tokenize text using the selected language's word boundary rules."""
     text = _coerce_text(text, "text")
+    language = _normalize_language(language)
+    if language == "zh":
+        try:
+            import jieba
+        except ImportError:
+            return [character.casefold() for character in text if character.isalnum()]
+        return [
+            token.casefold()
+            for token in (
+                regex_sub(r"[^\w]", "", word, flags=REGEX_UNICODE)
+                for word in jieba.cut(text)
+            )
+            if token
+        ]
     text = regex_sub(r'[^\w ]', '', text, flags=REGEX_UNICODE)  # strip special chars
-    return [x.strip('.').lower() for x in text.split()]
+    return [word.casefold() for word in text.split()]
 
 
-def keywords(text):
-    """get the top 10 keywords and their frequency scores
-    ignores blacklisted words in stopWords,
-    counts the number of occurrences of each word
+def keywords(text, language="en", stop_words=None):
+    """Get the top 10 keyword frequencies for text in the selected language.
+
+    Stopwords are excluded before ranking.
     """
-    text = split_words(text)
+    language = _normalize_language(language)
+    if stop_words is None:
+        stop_words = _load_stop_words(language)
+    text = split_words(text, language)
     numWords = len(text)  # of words before removing blacklist words
-    freq = Counter(x for x in text if x not in stopWords)
+    freq = Counter(x for x in text if x not in stop_words)
 
     minSize = min(10, len(freq))  # get first 10
     keywords = {x: y for x, y in freq.most_common(minSize)}  # recreate a dict
@@ -366,12 +440,14 @@ def length_score(sentence):
     return max(0.0, 1.0 - fabs(ideal - len(sentence)) / ideal)
 
 
-def title_score(title, sentence):
-    title_terms = {word for word in title if word not in stopWords}
+def title_score(title, sentence, stop_words=None):
+    if stop_words is None:
+        stop_words = stopWords
+    title_terms = {word for word in title if word not in stop_words}
     if not title_terms:
         return 0.0
 
-    sentence_terms = {word for word in sentence if word not in stopWords}
+    sentence_terms = {word for word in sentence if word not in stop_words}
     return len(title_terms.intersection(sentence_terms)) / float(len(title_terms))
 
 
