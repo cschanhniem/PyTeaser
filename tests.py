@@ -4,7 +4,7 @@ import socket
 from io import BytesIO
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from unittest import TestCase, main as unittest_main
 from unittest.mock import MagicMock, patch
 from urllib.request import Request
@@ -26,6 +26,7 @@ from pyteaser import (
     length_score,
     score,
     split_sentences,
+    split_words,
     stopWords,
     title_score,
 )
@@ -171,6 +172,28 @@ class TestSummarize(TestCase):
         self.assertIn("government", keywords("Government police"))
         self.assertIn("police", keywords("Government police"))
 
+    def test_language_specific_stopwords_are_used(self):
+        spanish_keywords = keywords(
+            "El gobierno anuncia una nueva reforma", language="es")
+
+        self.assertNotIn("el", spanish_keywords)
+        self.assertNotIn("una", spanish_keywords)
+        self.assertIn("gobierno", spanish_keywords)
+        self.assertIn("reforma", spanish_keywords)
+
+    def test_chinese_tokenizer_is_used_when_available(self):
+        jieba = ModuleType("jieba")
+        jieba.cut = lambda text: ["研究者", "公布", "新发现", "。"]
+
+        with patch.dict("sys.modules", {"jieba": jieba}):
+            words = split_words("研究者公布新发现。", language="zh")
+
+        self.assertEqual(words, ["研究者", "公布", "新发现"])
+
+    def test_unsupported_language_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Unsupported language"):
+            Summarize("Title", "Article text.", language="xx")
+
     def test_length_score_is_bounded(self):
         self.assertEqual(length_score(["word"] * 20), 1.0)
         self.assertEqual(length_score(["word"] * 40), 0.0)
@@ -230,6 +253,20 @@ class TestGooseExtraction(TestCase):
                 "https://example.test/article", sentence_count=2)
 
         self.assertEqual(len(summaries), 2)
+
+    def test_summarize_url_uses_article_language_metadata(self):
+        article = SimpleNamespace(
+            title="Articulo de ejemplo",
+            cleaned_text="El gobierno anuncia una nueva reforma.",
+            meta_lang="es",
+        )
+
+        with patch("pyteaser.grab_link", return_value=article):
+            with patch("pyteaser.Summarize", return_value=["resumen"]) as summarize:
+                result = SummarizeUrl("https://example.test/articulo")
+
+        self.assertEqual(result, ["resumen"])
+        self.assertEqual(summarize.call_args.kwargs["language"], "es")
 
     def test_private_image_url_is_skipped_without_failing_extraction(self):
         html = """<html><head><title>Image fetch test</title></head><body><article>
