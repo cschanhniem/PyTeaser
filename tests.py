@@ -10,7 +10,10 @@ from unittest.mock import MagicMock, patch
 from urllib.request import Request
 
 from goose import Goose
+from goose.article import Article
+from goose.configuration import Configuration
 from goose.crawler import Crawler
+from goose.extractors import StandardContentExtractor
 from goose.network import HtmlFetcher
 from goose.network import (
     SafeRedirectHandler,
@@ -292,6 +295,29 @@ class TestGooseExtraction(TestCase):
 
         get_image_extractor.assert_not_called()
         self.assertEqual(article.title, "No image fetch")
+
+
+class TestGooseLanguageSelection(TestCase):
+    def test_metadata_language_is_used_for_content_scoring(self):
+        config = Configuration()
+        article = Article()
+        article.meta_lang = "es-MX"
+        extractor = StandardContentExtractor(config)
+        extractor.nodes_to_check = lambda doc: []
+
+        extractor.calculate_best_node(article)
+
+        self.assertEqual(extractor.language, "es")
+
+    def test_configured_language_overrides_metadata_when_forced(self):
+        config = Configuration()
+        config.use_meta_language = False
+        config.target_language = "fr"
+        article = Article()
+        article.meta_lang = "es"
+        extractor = StandardContentExtractor(config)
+
+        self.assertEqual(extractor.get_language(article), "fr")
 
 
 class TestNetworkPolicy(TestCase):
