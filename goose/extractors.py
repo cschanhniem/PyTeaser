@@ -55,12 +55,11 @@ class ContentExtractor(object):
         Returns the language is by the article or
         the configuration language
         """
-        # we don't want to force the target language
-        # so we use the article.meta_lang
-        if self.config.use_meta_language == True:
-            if article.meta_lang:
-                self.language = article.meta_lang[:2]
-        self.language = self.config.target_language
+        if self.config.use_meta_language and article.meta_lang:
+            language = article.meta_lang.split("-", 1)[0][:2].lower()
+            if re.search(RE_LANG, language):
+                return language
+        return self.config.target_language
 
     def get_title(self, article):
         """\
@@ -234,6 +233,7 @@ class ContentExtractor(object):
         return set(tags)
 
     def calculate_best_node(self, article):
+        self.language = self.get_language(article)
         doc = article.doc
         top_node = None
         nodes_to_check = self.nodes_to_check(doc)
