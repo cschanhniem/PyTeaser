@@ -142,6 +142,16 @@ def Summarize(title, text, sentence_count=5, language="en"):
     return [sentence for _, sentence, _ in selected]
 
 
+def summarize(title, text, sentence_count=5, language="en"):
+    """PEP 8 spelling of :func:`Summarize`."""
+    return Summarize(title, text, sentence_count, language)
+
+
+def summarize_url(url, sentence_count=5, language=None):
+    """PEP 8 spelling of :func:`SummarizeUrl`."""
+    return SummarizeUrl(url, sentence_count, language)
+
+
 def _coerce_text(value, name, allow_none=False):
     if value is None and allow_none:
         return ""
