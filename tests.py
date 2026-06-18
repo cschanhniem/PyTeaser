@@ -30,6 +30,8 @@ from pyteaser import (
     score,
     split_sentences,
     split_words,
+    summarize,
+    summarize_url,
     stopWords,
     title_score,
 )
@@ -62,6 +64,13 @@ class TestSummarize(TestCase):
         self.assertEqual(Summarize("Café".encode("utf-8"), "Café matters.".encode("utf-8")), [
             "Café matters.",
         ])
+
+    def test_pep8_text_api_matches_legacy_name(self):
+        text = "Researchers announced a discovery. Experts reviewed the evidence."
+        self.assertEqual(
+            summarize("Discovery", text, sentence_count=1),
+            Summarize("Discovery", text, sentence_count=1),
+        )
 
     def test_unsupported_text_types_raise_clear_errors(self):
         with self.assertRaisesRegex(TypeError, "text must be a string"):
@@ -270,6 +279,19 @@ class TestGooseExtraction(TestCase):
 
         self.assertEqual(result, ["resumen"])
         self.assertEqual(summarize.call_args.kwargs["language"], "es")
+
+    def test_pep8_url_api_forwards_options(self):
+        article = SimpleNamespace(
+            title="Example article",
+            cleaned_text="Researchers announced a discovery. Experts reviewed evidence.",
+            meta_lang="en",
+        )
+
+        with patch("pyteaser.grab_link", return_value=article):
+            summaries = summarize_url(
+                "https://example.test/article", sentence_count=1)
+
+        self.assertEqual(len(summaries), 1)
 
     def test_private_image_url_is_skipped_without_failing_extraction(self):
         html = """<html><head><title>Image fetch test</title></head><body><article>
