@@ -25,8 +25,6 @@ import os
 from http.client import HTTPException
 from urllib.error import HTTPError, URLError
 
-from PIL import Image
-
 from goose.network import fetch_bytes
 from goose.utils.encoding import smart_str
 from goose.images.image import ImageDetails
@@ -37,6 +35,13 @@ class ImageUtils(object):
 
     @classmethod
     def get_image_dimensions(self, identify_program, path):
+        try:
+            from PIL import Image
+        except ImportError as error:
+            raise RuntimeError(
+                "Image extraction requires Pillow; install pyteaser[images]."
+            ) from error
+
         image = Image.open(path)
         image_details = ImageDetails()
         image_details.set_mime_type(image.format)
