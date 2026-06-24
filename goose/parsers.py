@@ -21,7 +21,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 import lxml.html
-from lxml.html import soupparser
 from lxml import etree
 from copy import deepcopy
 from goose.text import innerTrim
@@ -239,6 +238,12 @@ class ParserSoup(Parser):
 
     @classmethod
     def fromstring(self, html):
+        try:
+            from lxml.html import soupparser
+        except ImportError as error:
+            raise RuntimeError(
+                "The soup parser requires BeautifulSoup; install pyteaser[soup]."
+            ) from error
         html = encodeValue(html)
         self.doc = soupparser.fromstring(html)
         return self.doc
