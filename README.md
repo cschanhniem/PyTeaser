@@ -1,54 +1,82 @@
-PyTeaser
-========
+# PyTeaser
 
-PyTeaser takes any news article and extract a brief summary from it. It's based on the original [Scala](https://github.com/MojoJolo/textteaser) project.
+PyTeaser extracts a short, extractive summary from article text or a news URL. It ranks sentences using title relevance, article keywords, sentence length, and position, then removes repeated content and returns the selected sentences in the article's original order.
 
+## Requirements and installation
 
-Summaries are created by ranking sentences in a news article according to how relevant they are to the entire text. The top 5 sentences are used to form a "summary". Each sentence is ranked by using four criteria:
+PyTeaser requires Python 3.10 or newer.
 
-- Relevance to the title
-- Relevance to keywords in the article
-- Position of the sentence
-- Length of the sentence
-
-
-# Installation:
-Requires Python 2.7. (Need Collections.Counter)
-```
-sudo pip install pyteaser
+```bash
+python -m pip install pyteaser
 ```
 
-These dependency packages will be automatically installed:
-```
-Pillow
-lxml
-cssselect
-jieba
-beautifulsoup
-```
-Note: if you're installing on Windows, you have to install one of the dependency package lxml manually using:
+Optional functionality is installed separately:
 
-```
-easy_install lxml==2.3.3
+```bash
+python -m pip install 'pyteaser[images]'   # Pillow-backed image extraction
+python -m pip install 'pyteaser[chinese]'   # jieba Chinese word segmentation
+python -m pip install 'pyteaser[soup]'      # BeautifulSoup-based fallback parser
+python -m pip install 'pyteaser[all]'       # all optional features
 ```
 
-More information about this issue here: https://github.com/xiaoxu193/PyTeaser/issues/17
+When working from a source checkout, replace `pyteaser` with `.` (or `.[all]`).
 
+## Summarize text
 
-# Usage:
-## sample command:
-```Python
->>> from pyteaser import SummarizeUrl
->>> url = 'http://www.huffingtonpost.com/2013/11/22/twitter-forward-secrecy_n_4326599.html'
->>> summaries = SummarizeUrl(url)
->>> print summaries
+```python
+from pyteaser import summarize
 
+title = "A sample article"
+text = "The first sentence explains the announcement. A second sentence gives context. A third sentence describes what happens next."
+
+summary = summarize(title, text, sentence_count=2, language="en")
+for sentence in summary:
+    print(sentence)
 ```
 
-## output
-```
-["Twitter\'s move is the latest response from U.S. Internet firms following disclosures by former spy agency contractor Edward Snowden about widespread, classified U.S. government surveillance programs.", "\\"Since then, it has become clearer and clearer how important that step was to protecting our users\' privacy.\\"", "The online messaging service, which began scrambling communications in 2011 using traditional HTTPS encryption, said on Friday it has added an advanced layer of protection for HTTPS known as \\"forward secrecy.\\"", "\\"A year and a half ago, Twitter was first served completely over HTTPS,\\" the company said in a blog posting.", " \\"I\'m glad this is the direction the industry is taking.\\" \\n\\n(Reporting by Jim Finkle; editing by Andrew Hay)"]
+`title` may be `None`; article text must be a string or UTF-8 bytes. Blank text returns an empty list. `sentence_count` defaults to 5, must be a non-negative integer, and may be set to 0 to request no sentences.
 
+The original `Summarize(title, text)` function remains available. Both APIs return a list of sentence strings.
+
+## Summarize a URL
+
+```python
+from pyteaser import summarize_url
+
+summary = summarize_url("https://example.com/news/article", sentence_count=3)
 ```
 
-you can use Summarize(title, text) directly if you already have the text and the title. Otherwise you must install Python Goose to extract text from url.
+URL summarization extracts the page's title and article text first. If the page declares a supported language, PyTeaser uses its stopword list; otherwise English is used. You can also explicitly pass `language="es"`, for example.
+
+The bundled language resources cover English, Spanish, Italian, German, Swedish, Russian, French, Arabic, and Chinese. Chinese segmentation uses jieba when installed; without it, PyTeaser falls back to character tokenization. Language support is heuristic, so review summaries for your content and audience.
+
+The legacy `SummarizeUrl(url)` function remains available. URL fetching or article-extraction failures return `None`; text summarization returns a list (possibly empty).
+
+## URL and image safety
+
+URL fetching accepts HTTP(S) on standard ports, applies a 10-second request timeout and a 5 MiB HTML limit, validates resolved addresses and redirect targets, and blocks private/non-routable addresses by default. Image fetching is disabled by default; enable it only when needed:
+
+```python
+from goose import Goose
+
+article = Goose({"enable_image_fetching": True}).extract(
+    url="https://example.com/news/article"
+)
+print(article.top_image.src)
+```
+
+Image downloads are capped at 15 MiB and require the `images` extra. Applications processing untrusted URLs should keep private-network access disabled. For trusted local development only, Goose supports `allow_private_network=True`; do not enable this for user-controlled URLs.
+
+Use article extraction responsibly and comply with the target site's terms and applicable law.
+
+## Tests
+
+The test suite is offline; URL cases use mocked responses or a local loopback server.
+
+```bash
+python -m unittest discover -v
+```
+
+## License
+
+PyTeaser's original code is MIT-licensed. The bundled Goose article extractor is Apache-2.0-licensed; see `LICENSE` and `goose/LICENSE.txt`.
