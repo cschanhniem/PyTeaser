@@ -21,6 +21,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 import os
+import tempfile
 from goose.version import version_info, __version__
 from goose.configuration import Configuration
 from goose.crawler import CrawlCandidate
@@ -61,26 +62,27 @@ class Goose(object):
         return article
 
     def initialize(self):
-        # test if config.local_storage_path
-        # is a directory
-        if not os.path.isdir(self.config.local_storage_path):
-            os.makedirs(self.config.local_storage_path)
+        storage_path = self.config.local_storage_path
+        try:
+            os.makedirs(storage_path, exist_ok=True)
+        except OSError as error:
+            raise OSError(
+                storage_path + " directory does not seem to exist, "
+                "you need to set this for image processing downloads"
+            ) from error
 
-        if not os.path.isdir(self.config.local_storage_path):
-            raise Exception(self.config.local_storage_path +
+        if not os.path.isdir(storage_path):
+            raise OSError(storage_path +
                 " directory does not seem to exist, "
                 "you need to set this for image processing downloads"
             )
 
-        # test to write a dummy file to the directory
-        # to check is directory is writable
-        path = os.path.join(self.config.local_storage_path, 'test.txt')
         try:
-            f = open(path, 'w')
-            f.close()
-            os.remove(path)
-        except IOError:
-            raise Exception(self.config.local_storage_path +
+            with tempfile.NamedTemporaryFile(
+                    prefix=".goose-write-test-", dir=storage_path, delete=True):
+                pass
+        except OSError as error:
+            raise OSError(storage_path +
                 " directory is not writeble, "
                 "you need to set this for image processing downloads"
-            )
+            ) from error
