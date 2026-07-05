@@ -1,6 +1,9 @@
 """Offline tests for PyTeaser's text summarization API."""
 
 import socket
+import os
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
@@ -340,6 +343,20 @@ class TestGooseLanguageSelection(TestCase):
         extractor = StandardContentExtractor(config)
 
         self.assertEqual(extractor.get_language(article), "fr")
+
+
+class TestGooseInitialization(TestCase):
+    def test_concurrent_initialization_uses_unique_write_probes(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            storage_path = os.path.join(temporary_directory, "nested", "goose")
+            config = SimpleNamespace(local_storage_path=storage_path)
+
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                instances = list(executor.map(lambda _: Goose(config), range(16)))
+
+            self.assertEqual(len(instances), 16)
+            self.assertTrue(os.path.isdir(storage_path))
+            self.assertFalse(os.path.exists(os.path.join(storage_path, "test.txt")))
 
 
 class TestNetworkPolicy(TestCase):
