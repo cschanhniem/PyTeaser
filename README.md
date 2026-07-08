@@ -50,7 +50,7 @@ URL summarization extracts the page's title and article text first. If the page 
 
 The bundled language resources cover English, Spanish, Italian, German, Swedish, Russian, French, Arabic, and Chinese. Chinese segmentation uses jieba when installed; without it, PyTeaser falls back to character tokenization. Language support is heuristic, so review summaries for your content and audience.
 
-The legacy `SummarizeUrl(url)` function remains available. URL fetching or article-extraction failures return `None`; text summarization returns a list (possibly empty).
+The legacy `SummarizeUrl(url)` function remains available. URL summarization returns a list, or raises `ArticleFetchError` when a page cannot be fetched safely and `ArticleExtractionError` when no title/body can be extracted. Invalid text, language, and sentence-count inputs raise `TypeError` or `ValueError`.
 
 ## URL and image safety
 
