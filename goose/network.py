@@ -37,6 +37,10 @@ from urllib.request import (
 )
 
 
+class FetchError(IOError):
+    """Raised when a page cannot be fetched within the configured policy."""
+
+
 def _resolve_addresses(host, port, allow_private_network=False):
     """Resolve once, validate every address, and return numeric IP addresses."""
     try:
@@ -225,7 +229,7 @@ class HtmlFetcher(object):
 
     def get_html(self, config, url):
         """\
-        Fetch an HTML document, returning None when it cannot be fetched safely.
+        Fetch an HTML document or raise FetchError when the request fails.
         """
         try:
             return fetch_bytes(
@@ -234,5 +238,5 @@ class HtmlFetcher(object):
                 config.max_html_bytes,
                 accepted_content_types={"text/html", "application/xhtml+xml"},
             )
-        except (HTTPError, URLError, OSError, HTTPException, ValueError):
-            return None
+        except (HTTPError, URLError, OSError, HTTPException, ValueError) as error:
+            raise FetchError("Article HTML could not be fetched safely") from error
