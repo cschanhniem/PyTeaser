@@ -80,18 +80,42 @@ _CONTEXTUAL_ABBREVIATIONS = {
 }
 
 
+class PyTeaserError(Exception):
+    """Base exception for URL article summarization failures."""
+
+
+class ArticleFetchError(PyTeaserError):
+    """Raised when an article page could not be fetched safely."""
+
+
+class ArticleExtractionError(PyTeaserError):
+    """Raised when a fetched page does not yield an article."""
+
+
 def SummarizeUrl(url, sentence_count=5, language=None):
     sentence_count = _validate_sentence_count(sentence_count)
     requested_language = (
         _normalize_language(language) if language is not None else None)
-    summaries = []
+    url = _coerce_text(url, "url")
+    if not url.strip():
+        raise ValueError("url must not be empty")
+    if sentence_count == 0:
+        return []
+
+    from lxml.etree import LxmlError
+    from goose.network import FetchError
+
     try:
         article = grab_link(url)
-    except IOError:
-        return None
+    except FetchError as error:
+        raise ArticleFetchError("Could not fetch the article URL") from error
+    except (LxmlError, OSError, TypeError, ValueError) as error:
+        raise ArticleExtractionError(
+            "Could not extract an article from the URL") from error
 
     if not (article and article.cleaned_text and article.title):
-        return None
+        raise ArticleExtractionError(
+            "The page did not contain both an article title and body text")
 
     if requested_language is None:
         try:
@@ -250,12 +274,7 @@ def _jaccard_similarity(left, right):
 def grab_link(inurl):
     #extract article information using Python Goose
     from goose import Goose
-    try:
-        article = Goose().extract(url=inurl)
-        return article
-    except ValueError:
-        return None
-    return None
+    return Goose().extract(url=inurl)
 
 
 def score(sentences, titleWords, keywords, language="en", stop_words=None):
