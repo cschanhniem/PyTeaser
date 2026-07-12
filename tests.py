@@ -17,7 +17,7 @@ from goose.article import Article
 from goose.configuration import Configuration
 from goose.crawler import Crawler
 from goose.extractors import StandardContentExtractor
-from goose.network import HtmlFetcher
+from goose.network import FetchError, HtmlFetcher
 from goose.network import (
     SafeRedirectHandler,
     _SafeHTTPConnection,
@@ -26,6 +26,8 @@ from goose.network import (
     validate_url,
 )
 from pyteaser import (
+    ArticleExtractionError,
+    ArticleFetchError,
     Summarize,
     SummarizeUrl,
     keywords,
@@ -296,6 +298,18 @@ class TestGooseExtraction(TestCase):
 
         self.assertEqual(len(summaries), 1)
 
+    def test_url_fetch_failure_raises_public_exception(self):
+        with patch("pyteaser.grab_link", side_effect=FetchError("blocked")):
+            with self.assertRaises(ArticleFetchError):
+                SummarizeUrl("https://example.test/article")
+
+    def test_missing_article_content_raises_public_exception(self):
+        article = SimpleNamespace(title="", cleaned_text="Some text", meta_lang="en")
+
+        with patch("pyteaser.grab_link", return_value=article):
+            with self.assertRaises(ArticleExtractionError):
+                SummarizeUrl("https://example.test/article")
+
     def test_private_image_url_is_skipped_without_failing_extraction(self):
         html = """<html><head><title>Image fetch test</title></head><body><article>
           <p>This is a sufficiently long paragraph about article extraction, safe network handling, and testing.</p>
@@ -426,6 +440,11 @@ class TestNetworkPolicy(TestCase):
 
         self.assertEqual(content, b"page")
         self.assertEqual(opener.open.call_args.kwargs["timeout"], 2.5)
+
+    def test_html_fetcher_raises_typed_fetch_error(self):
+        with patch("goose.network.fetch_bytes", side_effect=ValueError("blocked")):
+            with self.assertRaises(FetchError):
+                HtmlFetcher().get_html(Configuration(), "https://example.test/")
 
     def test_fetches_from_loopback_when_explicitly_allowed(self):
         body = b"<html>local test</html>"
