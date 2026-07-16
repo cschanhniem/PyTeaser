@@ -1,0 +1,1 @@
+"""Image-extraction resource data."""
