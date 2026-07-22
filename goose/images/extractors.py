@@ -62,8 +62,7 @@ class UpgradedImageIExtractor(ImageExtractor):
         # parser
         self.parser = self.config.get_parser()
 
-        # What's the minimum bytes for an image we'd accept is
-        self.images_min_bytes = 4000
+        self.images_min_bytes = config.images_min_bytes
 
         # the webpage url that we're extracting content from
         self.target_url = article.final_url
@@ -183,24 +182,23 @@ class UpgradedImageIExtractor(ImageExtractor):
             src = local_image.src
             file_extension = local_image.file_extension
 
-            if file_extension != '.gif' or file_extension != 'NA':
-                if (depth_level >= 1 and local_image.width > 300) or depth_level < 1:
-                    if not self.is_banner_dimensions(width, height):
-                        if width > MIN_WIDTH:
-                            sequence_score = float(1.0 / cnt)
-                            area = float(width * height)
-                            total_score = float(0.0)
+            if file_extension in ('.gif', 'NA'):
+                continue
+            if depth_level >= 1 and local_image.width <= 300:
+                continue
+            if self.is_banner_dimensions(width, height) or width <= MIN_WIDTH:
+                continue
 
-                            if initial_area == 0:
-                                initial_area = area * float(1.48)
-                                total_score = 1
-                            else:
-                                area_difference = float(area / initial_area)
-                                total_score = sequence_score * area_difference
+            sequence_score = float(1.0 / cnt)
+            area = float(width * height)
+            if initial_area == 0:
+                initial_area = area * 1.48
+                total_score = 1.0
+            else:
+                total_score = sequence_score * float(area / initial_area)
 
-                            image_results.update({local_image: total_score})
-                            cnt += 1
-                            cnt += 1
+            image_results[local_image] = total_score
+            cnt += 1
         return image_results
 
     def get_image(self, element, src, score=100, extraction_type="N/A"):
@@ -227,6 +225,9 @@ class UpgradedImageIExtractor(ImageExtractor):
         returns true if we think this is kind of a bannery dimension
         like 600 / 100 = 6 may be a fishy dimension for a good image
         """
+        if width <= 0 or height <= 0:
+            return True
+
         if width == height:
             return False
 
@@ -290,7 +291,6 @@ class UpgradedImageIExtractor(ImageExtractor):
         that have the best bytez to even make them a candidate
         """
         cnt = 0
-        MAX_BYTES_SIZE = 15728640
         good_images = []
         for image in images:
             if cnt >= 30:
@@ -301,9 +301,8 @@ class UpgradedImageIExtractor(ImageExtractor):
             local_image = self.get_local_image(src)
             if local_image is None:
                 continue
-            bytes = local_image.bytes
-            if (bytes == 0 or bytes > self.images_min_bytes) \
-                    and bytes < MAX_BYTES_SIZE:
+            image_bytes = local_image.bytes
+            if self.images_min_bytes < image_bytes <= self.config.max_image_bytes:
                 good_images.append(image)
         return good_images if len(good_images) > 0 else None
 
@@ -359,10 +358,10 @@ class UpgradedImageIExtractor(ImageExtractor):
           are on specific sites
         """
         domain = self.get_clean_domain()
+        known_image_names = list(KNOWN_IMG_DOM_NAMES)
         if domain in self.custom_site_mapping:
-            classes = self.custom_site_mapping.get(domain).split('|')
-            for classname in classes:
-                KNOWN_IMG_DOM_NAMES.append(classname)
+            known_image_names.extend(
+                self.custom_site_mapping[domain].split('|'))
 
         image = None
         doc = self.article.raw_doc
@@ -382,7 +381,7 @@ class UpgradedImageIExtractor(ImageExtractor):
             return image
 
         # check for elements with known id
-        for css in KNOWN_IMG_DOM_NAMES:
+        for css in known_image_names:
             elements = self.parser.getElementsByTag(doc, attr="id", value=css)
             image = _check_elements(elements)
             if image is not None:
@@ -391,7 +390,7 @@ class UpgradedImageIExtractor(ImageExtractor):
                     return self.get_image(image, src, score=90, extraction_type='known')
 
         # check for elements with known classes
-        for css in KNOWN_IMG_DOM_NAMES:
+        for css in known_image_names:
             elements = self.parser.getElementsByTag(doc, attr='class', value=css)
             image = _check_elements(elements)
             if image is not None:
@@ -422,5 +421,8 @@ class UpgradedImageIExtractor(ImageExtractor):
         data_file = FileHelper.loadResourceFile(path)
         lines = data_file.splitlines()
         for line in lines:
-            domain, css = line.split('^')
+            line = line.strip()
+            if not line or '^' not in line:
+                continue
+            domain, css = line.split('^', 1)
             self.custom_site_mapping.update({domain: css})
