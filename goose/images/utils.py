@@ -42,10 +42,10 @@ class ImageUtils(object):
                 "Image extraction requires Pillow; install pyteaser[images]."
             ) from error
 
-        image = Image.open(path)
         image_details = ImageDetails()
-        image_details.set_mime_type(image.format)
-        width, height = image.size
+        with Image.open(path) as image:
+            image_details.set_mime_type(image.format)
+            width, height = image.size
         image_details.set_width(width)
         image_details.set_height(height)
         return image_details
@@ -73,12 +73,15 @@ class ImageUtils(object):
 
     @classmethod
     def get_mime_type(self, image_details):
-        mime_type = image_details.get_mime_type().lower()
+        mime_type = (image_details.get_mime_type() or '').lower()
         mimes = {
             'png': '.png',
             'jpg': '.jpg',
             'jpeg': '.jpg',
             'gif': '.gif',
+            'webp': '.webp',
+            'bmp': '.bmp',
+            'tiff': '.tiff',
         }
         return mimes.get(mime_type, 'NA')
 
