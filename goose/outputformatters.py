@@ -21,7 +21,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 from html import unescape
-from goose.text import innerTrim
+from goose.text import innerTrim, stopwords_class_for_language
 
 
 class OutputFormatter(object):
@@ -40,9 +40,8 @@ class OutputFormatter(object):
         """
         # we don't want to force the target language
         # so we use the article.meta_lang
-        if self.config.use_meta_language == True:
-            if article.meta_lang:
-                return article.meta_lang[:2]
+        if self.config.use_meta_language and article.meta_lang:
+            return article.meta_lang.split('-', 1)[0][:2].lower()
         return self.config.target_language
 
     def get_top_node(self):
@@ -111,7 +110,10 @@ class OutputFormatter(object):
         for el in all_nodes:
             tag = self.parser.getTag(el)
             text = self.parser.getText(el)
-            stop_words = self.stopwords_class(language=self.get_language(article)).get_stopword_count(text)
+            language = self.get_language(article)
+            analyzer_class = stopwords_class_for_language(
+                language, self.stopwords_class)
+            stop_words = analyzer_class(language=language).get_stopword_count(text)
             if (tag != 'br' or text != '\\r') and stop_words.get_stopword_count() < 3 \
                 and len(self.parser.getElementsByTag(el, tag='object')) == 0 \
                 and len(self.parser.getElementsByTag(el, tag='embed')) == 0:
