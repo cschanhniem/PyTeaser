@@ -129,8 +129,18 @@ class StopWordsChinese(StopWords):
         # jieba build a tree that takes sometime
         # avoid building the tree if we don't use
         # chinese language
-        import jieba
+        try:
+            import jieba
+        except ImportError:
+            return [character for character in stripped_input if character.isalnum()]
         return jieba.cut(stripped_input, cut_all=True)
+
+
+def stopwords_class_for_language(language, configured_class):
+    """Choose Chinese segmentation automatically for the default analyzer."""
+    if language == 'zh' and configured_class is StopWords:
+        return StopWordsChinese
+    return configured_class
 
 
 class StopWordsArabic(StopWords):
@@ -140,9 +150,6 @@ class StopWordsArabic(StopWords):
     def __init__(self, language='ar'):
         # force ar language code
         super(StopWordsArabic, self).__init__(language='ar')
-
-    def remove_punctuation(self, content):
-        return content
 
     def candiate_words(self, stripped_input):
         import nltk
