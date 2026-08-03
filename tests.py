@@ -29,6 +29,7 @@ from goose.network import (
     validate_url,
 )
 from goose.parsers import Parser
+from goose.text import StopWords, StopWordsChinese, stopwords_class_for_language
 from pyteaser import (
     ArticleExtractionError,
     ArticleFetchError,
@@ -361,6 +362,18 @@ class TestGooseLanguageSelection(TestCase):
         extractor = StandardContentExtractor(config)
 
         self.assertEqual(extractor.get_language(article), "fr")
+
+    def test_chinese_metadata_selects_character_aware_stopwords(self):
+        extractor = StandardContentExtractor(Configuration())
+        extractor.language = "zh"
+
+        with patch.dict("sys.modules", {"jieba": None}):
+            stats = extractor.get_word_stats("研究者在这里")
+
+        self.assertEqual(stats.get_word_count(), 6)
+        self.assertGreater(stats.get_stopword_count(), 0)
+        self.assertIs(
+            stopwords_class_for_language("zh", StopWords), StopWordsChinese)
 
 
 class TestGooseInitialization(TestCase):
