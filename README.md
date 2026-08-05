@@ -34,7 +34,7 @@ for sentence in summary:
     print(sentence)
 ```
 
-`title` may be `None`; article text must be a string or UTF-8 bytes. Blank text returns an empty list. `sentence_count` defaults to 5, must be a non-negative integer, and may be set to 0 to request no sentences.
+`title` may be `None`; article text must be a string or UTF-8 bytes. Blank text returns an empty list. `sentence_count` defaults to 5, must be a non-negative integer, and may be set to 0 to request no sentences. Optional `max_words` sets a total token budget; candidates that do not fit are skipped.
 
 The original `Summarize(title, text)` function remains available. Both APIs return a list of sentence strings.
 
