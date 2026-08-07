@@ -92,14 +92,15 @@ class ArticleExtractionError(PyTeaserError):
     """Raised when a fetched page does not yield an article."""
 
 
-def SummarizeUrl(url, sentence_count=5, language=None):
+def SummarizeUrl(url, sentence_count=5, language=None, max_words=None):
     sentence_count = _validate_sentence_count(sentence_count)
+    max_words = _validate_max_words(max_words)
     requested_language = (
         _normalize_language(language) if language is not None else None)
     url = _coerce_text(url, "url")
     if not url.strip():
         raise ValueError("url must not be empty")
-    if sentence_count == 0:
+    if sentence_count == 0 or max_words == 0:
         return []
 
     from lxml.etree import LxmlError
@@ -128,10 +129,11 @@ def SummarizeUrl(url, sentence_count=5, language=None):
         str(article.cleaned_text),
         sentence_count,
         language=requested_language,
+        max_words=max_words,
     )
 
 
-def Summarize(title, text, sentence_count=5, language="en"):
+def Summarize(title, text, sentence_count=5, language="en", max_words=None):
     """Return an extractive summary for a title and article text.
 
     Text arguments may be strings or UTF-8 encoded bytes. A missing title is
@@ -139,13 +141,14 @@ def Summarize(title, text, sentence_count=5, language="en"):
     ``language`` selects tokenization and bundled stopwords.
     """
     sentence_count = _validate_sentence_count(sentence_count)
+    max_words = _validate_max_words(max_words)
     language = _normalize_language(language)
     active_stop_words = _load_stop_words(language)
     title = _coerce_text(title, "title", allow_none=True)
     text = _coerce_text(text, "text")
     if not text.strip():
         return []
-    if sentence_count == 0:
+    if sentence_count == 0 or max_words == 0:
         return []
 
     sentences = split_sentences(text)
@@ -161,19 +164,24 @@ def Summarize(title, text, sentence_count=5, language="en"):
         key=lambda result: (-result[2], result[0]),
     )
     selected = _select_non_redundant(
-        ranked, sentence_count, language=language, stop_words=active_stop_words)
+        ranked,
+        sentence_count,
+        language=language,
+        stop_words=active_stop_words,
+        max_words=max_words,
+    )
     selected.sort(key=lambda result: result[0])
     return [sentence for _, sentence, _ in selected]
 
 
-def summarize(title, text, sentence_count=5, language="en"):
+def summarize(title, text, sentence_count=5, language="en", max_words=None):
     """PEP 8 spelling of :func:`Summarize`."""
-    return Summarize(title, text, sentence_count, language)
+    return Summarize(title, text, sentence_count, language, max_words)
 
 
-def summarize_url(url, sentence_count=5, language=None):
+def summarize_url(url, sentence_count=5, language=None, max_words=None):
     """PEP 8 spelling of :func:`SummarizeUrl`."""
-    return SummarizeUrl(url, sentence_count, language)
+    return SummarizeUrl(url, sentence_count, language, max_words)
 
 
 def _coerce_text(value, name, allow_none=False):
@@ -231,16 +239,30 @@ def _validate_sentence_count(sentence_count):
     return sentence_count
 
 
+def _validate_max_words(max_words):
+    if max_words is None:
+        return None
+    if isinstance(max_words, bool) or not isinstance(max_words, int):
+        raise TypeError("max_words must be a non-negative integer or None")
+    if max_words < 0:
+        raise ValueError("max_words must be a non-negative integer")
+    return max_words
+
+
 def _select_non_redundant(
-        ranked, sentence_count, threshold=0.8, language="en", stop_words=None):
+        ranked, sentence_count, threshold=0.8, language="en", stop_words=None,
+        max_words=None):
     """Select high-ranked sentences while avoiding excessive word overlap."""
     if stop_words is None:
         stop_words = _load_stop_words(language)
     selected = []
     selected_terms = []
     selected_text = set()
+    selected_word_count = 0
     for candidate in ranked:
         words = split_words(candidate[1], language)
+        if max_words is not None and selected_word_count + len(words) > max_words:
+            continue
         normalized_text = " ".join(words) or candidate[1].strip().casefold()
         if normalized_text in selected_text:
             continue
@@ -259,6 +281,7 @@ def _select_non_redundant(
         selected.append(candidate)
         selected_terms.append(terms)
         selected_text.add(normalized_text)
+        selected_word_count += len(words)
         if len(selected) == sentence_count:
             break
     return selected
