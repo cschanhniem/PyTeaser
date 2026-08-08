@@ -105,6 +105,31 @@ class TestSummarize(TestCase):
         with self.assertRaisesRegex(TypeError, "sentence_count"):
             Summarize("Title", "Article text.", sentence_count=True)
 
+    def test_max_words_constrains_the_selected_summary(self):
+        sentences = [
+            "Researchers published detailed results yesterday.",
+            "Experts verified results.",
+        ]
+        ranked = [(0, sentences[0], 10.0), (1, sentences[1], 9.0)]
+
+        with patch("pyteaser.score", return_value=ranked):
+            summary = Summarize(
+                "Results", " ".join(sentences), sentence_count=2, max_words=3)
+
+        self.assertEqual(summary, [sentences[1]])
+        self.assertLessEqual(
+            sum(len(split_words(sentence)) for sentence in summary), 3)
+
+    def test_max_words_is_validated_and_can_be_zero(self):
+        self.assertEqual(
+            Summarize("Title", "Some words here.", max_words=0), [])
+        with self.assertRaisesRegex(ValueError, "max_words"):
+            Summarize("Title", "Some words here.", max_words=-1)
+        with self.assertRaisesRegex(TypeError, "max_words"):
+            Summarize("Title", "Some words here.", max_words=1.5)
+        with self.assertRaisesRegex(TypeError, "max_words"):
+            Summarize("Title", "Some words here.", max_words=True)
+
     def test_sentence_splitter_handles_lowercase_starts_and_quotes(self):
         self.assertEqual(
             split_sentences("First ends. lowercase follows! “Quoted?” yes."),
@@ -299,7 +324,7 @@ class TestGooseExtraction(TestCase):
 
         with patch("pyteaser.grab_link", return_value=article):
             summaries = summarize_url(
-                "https://example.test/article", sentence_count=1)
+                "https://example.test/article", sentence_count=1, max_words=10)
 
         self.assertEqual(len(summaries), 1)
 
