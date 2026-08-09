@@ -22,6 +22,7 @@ limitations under the License.
 """
 import hashlib
 import os
+import warnings
 from http.client import HTTPException
 from urllib.error import HTTPError, URLError
 
@@ -43,9 +44,19 @@ class ImageUtils(object):
             ) from error
 
         image_details = ImageDetails()
-        with Image.open(path) as image:
-            image_details.set_mime_type(image.format)
-            width, height = image.size
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", Image.DecompressionBombWarning)
+                with Image.open(path) as image:
+                    image_details.set_mime_type(image.format)
+                    width, height = image.size
+        except (
+            Image.DecompressionBombError,
+            Image.DecompressionBombWarning,
+            OSError,
+            ValueError,
+        ) as error:
+            raise ValueError("Invalid or unsafe image data") from error
         image_details.set_width(width)
         image_details.set_height(height)
         return image_details
@@ -89,15 +100,20 @@ class ImageUtils(object):
     def read_localfile(self, link_hash, src, config):
         local_image_name = self.get_localfile_name(link_hash, src, config)
         if os.path.isfile(local_image_name):
+            image_bytes = os.path.getsize(local_image_name)
+            if image_bytes <= 0 or image_bytes > config.max_image_bytes:
+                return None
             identify = config.imagemagick_identify_path
-            image_details = self.get_image_dimensions(identify, local_image_name)
+            try:
+                image_details = self.get_image_dimensions(identify, local_image_name)
+            except (OSError, ValueError):
+                return None
             file_extension = self.get_mime_type(image_details)
-            bytes = os.path.getsize(local_image_name)
             return LocallyStoredImage(
                 src=src,
                 local_filename=local_image_name,
                 link_hash=link_hash,
-                bytes=bytes,
+                bytes=image_bytes,
                 file_extension=file_extension,
                 height=image_details.get_height(),
                 width=image_details.get_width()
@@ -107,10 +123,23 @@ class ImageUtils(object):
     @classmethod
     def write_localfile(self, entity, link_hash, src, config):
         local_path = self.get_localfile_name(link_hash, src, config)
-        f = open(local_path, 'wb')
-        f.write(entity)
-        f.close()
-        return self.read_localfile(link_hash, src, config)
+        with open(local_path, 'wb') as image_file:
+            image_file.write(entity)
+        try:
+            image = self.read_localfile(link_hash, src, config)
+        except Exception:
+            self._remove_localfile(local_path)
+            raise
+        if image is None:
+            self._remove_localfile(local_path)
+        return image
+
+    @classmethod
+    def _remove_localfile(self, path):
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
 
     @classmethod
     def get_localfile_name(self, link_hash, src, config):
