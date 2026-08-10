@@ -4,6 +4,7 @@ import socket
 import os
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
+from importlib.util import find_spec
 from io import BytesIO
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
@@ -490,6 +491,44 @@ class TestImageExtraction(TestCase):
         image_details = ImageDetails()
         image_details.set_mime_type("WEBP")
         self.assertEqual(ImageUtils.get_mime_type(image_details), ".webp")
+
+    def test_cached_oversized_image_is_rejected_before_decode(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            config = SimpleNamespace(
+                local_storage_path=temporary_directory,
+                max_image_bytes=4,
+            )
+            src = "https://1.1.1.1/large.jpg"
+            local_path = ImageUtils.get_localfile_name("article", src, config)
+            with open(local_path, "wb") as image_file:
+                image_file.write(b"too large")
+
+            with patch.object(ImageUtils, "get_image_dimensions") as get_dimensions:
+                image = ImageUtils.read_localfile("article", src, config)
+
+        self.assertIsNone(image)
+        get_dimensions.assert_not_called()
+
+    def test_invalid_downloaded_image_is_discarded(self):
+        if find_spec("PIL") is None:
+            self.skipTest("Pillow is required to test image decoding")
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            config = SimpleNamespace(
+                local_storage_path=temporary_directory,
+                max_image_bytes=100,
+                request_timeout=1,
+                allow_private_network=False,
+                browser_user_agent="PyTeaser test",
+                imagemagick_identify_path="",
+            )
+            src = "https://1.1.1.1/not-an-image.jpg"
+            local_path = ImageUtils.get_localfile_name("article", src, config)
+            with patch("goose.images.utils.fetch_bytes", return_value=b"not image"):
+                image = ImageUtils.store_image(None, "article", src, config)
+
+        self.assertIsNone(image)
+        self.assertFalse(os.path.exists(local_path))
 
 
 class TestNetworkPolicy(TestCase):
