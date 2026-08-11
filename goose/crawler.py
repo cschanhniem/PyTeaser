@@ -73,9 +73,18 @@ class Crawler(object):
         article.doc = doc
         article.raw_doc = deepcopy(doc)
         article.title = extractor.get_title(article)
-        # TODO
-        # article.publish_date = config.publishDateExtractor.extract(doc)
-        # article.additional_data = config.get_additionaldata_extractor.extract(doc)
+        publishdate_extractor = self.config.get_publishdate_extractor()
+        if publishdate_extractor is not None:
+            article.publish_date = publishdate_extractor.extract(doc)
+
+        additional_data_extractor = self.config.get_additionaldata_extractor()
+        if additional_data_extractor is not None:
+            additional_data = additional_data_extractor.extract(doc)
+            if additional_data is not None:
+                if not isinstance(additional_data, dict):
+                    raise TypeError("additional data extractor must return a dict or None")
+                article.additional_data.update(additional_data)
+
         article.meta_lang = extractor.get_meta_lang(article)
         article.meta_favicon = extractor.get_favicon(article)
         article.meta_description = extractor.get_meta_description(article)
