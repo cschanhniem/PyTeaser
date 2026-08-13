@@ -366,6 +366,32 @@ class TestGooseExtraction(TestCase):
         get_image_extractor.assert_not_called()
         self.assertEqual(article.title, "No image fetch")
 
+    def test_custom_metadata_extractors_are_invoked(self):
+        class PublishDateExtractor:
+            def extract(self, document):
+                return "2025-02-03"
+
+        class AdditionalDataExtractor:
+            def extract(self, document):
+                return {"section": "science", "reviewed": True}
+
+        html = """<html><head><title>Metadata extraction test</title></head>
+        <body><article>
+          <p>This sufficiently long paragraph validates article metadata extractor hooks.</p>
+          <p>This second long paragraph ensures standard article content is still extracted.</p>
+        </article></body></html>"""
+        article = Goose({
+            "enable_image_fetching": False,
+            "extract_publishdate": PublishDateExtractor(),
+            "additional_data_extractor": AdditionalDataExtractor(),
+        }).extract(raw_html=html)
+
+        self.assertEqual(article.publish_date, "2025-02-03")
+        self.assertEqual(article.additional_data, {
+            "section": "science",
+            "reviewed": True,
+        })
+
 
 class TestGooseLanguageSelection(TestCase):
     def test_metadata_language_is_used_for_content_scoring(self):
