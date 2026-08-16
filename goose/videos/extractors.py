@@ -21,6 +21,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+from urllib.parse import urljoin
+
 from goose.videos.videos import Video
 
 VIDEOS_TAGS = ['iframe', 'embed', 'object', 'video']
@@ -48,7 +50,10 @@ class VideoExtractor(object):
         self.movies = []
 
     def get_embed_code(self, node):
-        return "".join([line.strip() for line in self.parser.nodeToString(node).splitlines()])
+        serialized = self.parser.nodeToString(node)
+        if isinstance(serialized, bytes):
+            serialized = serialized.decode("utf-8", "replace")
+        return "".join(line.strip() for line in serialized.splitlines())
 
     def get_embed_type(self, node):
         return self.parser.getTag(node)
@@ -86,8 +91,21 @@ class VideoExtractor(object):
         return self.get_video(node)
 
     def get_video_tag(self, node):
-        """extract html video tags"""
-        return Video()
+        """Extract an HTML5 video element or its first source child."""
+        video = self.get_video(node)
+        src = video.src
+        if not src:
+            sources = self.parser.getElementsByTag(node, tag="source")
+            for source in sources:
+                src = self.get_src(source)
+                if src:
+                    break
+        if not src:
+            return None
+
+        video.src = urljoin(self.article.final_url or "", src)
+        video.provider = self.get_provider(video.src) or "html5"
+        return video
 
     def get_embed_tag(self, node):
         # embed node may have an object node as parent
