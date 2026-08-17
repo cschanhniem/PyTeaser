@@ -31,6 +31,7 @@ from goose.network import (
 )
 from goose.parsers import Parser
 from goose.text import StopWords, StopWordsChinese, stopwords_class_for_language
+from goose.videos.extractors import VideoExtractor
 from pyteaser import (
     ArticleExtractionError,
     ArticleFetchError,
@@ -518,6 +519,27 @@ class TestImageExtraction(TestCase):
         image_details.set_mime_type("WEBP")
         self.assertEqual(ImageUtils.get_mime_type(image_details), ".webp")
 
+
+class TestVideoExtraction(TestCase):
+    def test_html5_video_source_is_extracted_and_made_absolute(self):
+        article = Article()
+        article.final_url = "https://news.example/world/story"
+        article.top_node = Parser.fromstring("""<div>
+          <video controls width="640" height="360">
+            <source src="media/report.mp4" type="video/mp4">
+          </video>
+        </div>""")
+
+        VideoExtractor(article, Configuration()).get_videos()
+
+        self.assertEqual(len(article.movies), 1)
+        self.assertEqual(article.movies[0].provider, "html5")
+        self.assertEqual(
+            article.movies[0].src, "https://news.example/world/media/report.mp4")
+        self.assertIn("<video", article.movies[0].embed_code)
+
+
+class TestImageFileSafety(TestCase):
     def test_cached_oversized_image_is_rejected_before_decode(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             config = SimpleNamespace(
