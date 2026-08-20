@@ -73,6 +73,7 @@ class Crawler(object):
         article.doc = doc
         article.raw_doc = deepcopy(doc)
         article.title = extractor.get_title(article)
+        article.publish_date = extractor.get_publish_date(article)
         publishdate_extractor = self.config.get_publishdate_extractor()
         if publishdate_extractor is not None:
             article.publish_date = publishdate_extractor.extract(doc)
