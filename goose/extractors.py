@@ -21,6 +21,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 import re
+import json
 from copy import deepcopy
 from urllib.parse import urlparse, urljoin
 from goose.utils import StringSplitter
@@ -191,6 +192,55 @@ class ContentExtractor(object):
         if the article has meta keywords set in the source, use that
         """
         return self.get_meta_content(article.doc, "meta[name=keywords]")
+
+    def get_publish_date(self, article):
+        """Extract a publication date from common metadata or JSON-LD."""
+        document = (
+            article.raw_doc if article.raw_doc is not None else article.doc)
+        date_selectors = (
+            ("meta[property='article:published_time']", "content"),
+            ("meta[property='og:published_time']", "content"),
+            ("meta[name='pubdate']", "content"),
+            ("meta[name='publishdate']", "content"),
+            ("meta[name='date']", "content"),
+            ("meta[itemprop='datePublished']", "content"),
+            ("time[itemprop='datePublished']", "datetime"),
+            ("time[datetime]", "datetime"),
+        )
+        for selector, attribute in date_selectors:
+            for element in self.parser.css_select(document, selector):
+                value = self.parser.getAttribute(element, attribute)
+                if value and value.strip():
+                    return value.strip()
+
+        scripts = self.parser.css_select(
+            document, "script[type='application/ld+json']")
+        for script in scripts:
+            try:
+                structured_data = json.loads("".join(script.itertext()))
+            except (TypeError, ValueError):
+                continue
+            value = self._find_structured_date(structured_data)
+            if value:
+                return value
+        return None
+
+    def _find_structured_date(self, value):
+        if isinstance(value, dict):
+            for field in ("datePublished", "dateCreated", "uploadDate"):
+                date_value = value.get(field)
+                if isinstance(date_value, str) and date_value.strip():
+                    return date_value.strip()
+            for nested_value in value.values():
+                date_value = self._find_structured_date(nested_value)
+                if date_value:
+                    return date_value
+        elif isinstance(value, list):
+            for nested_value in value:
+                date_value = self._find_structured_date(nested_value)
+                if date_value:
+                    return date_value
+        return None
 
     def get_canonical_link(self, article):
         """\
