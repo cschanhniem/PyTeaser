@@ -393,6 +393,33 @@ class TestGooseExtraction(TestCase):
             "reviewed": True,
         })
 
+    def test_publication_date_is_extracted_from_article_meta(self):
+        html = """<html><head>
+          <title>Published article</title>
+          <meta property="article:published_time" content="2025-04-05T12:30:00Z">
+        </head><body><article>
+          <p>This sufficiently long paragraph supports extraction of publication metadata.</p>
+          <p>This second paragraph ensures Goose recognizes the main article body.</p>
+        </article></body></html>"""
+
+        article = Goose({"enable_image_fetching": False}).extract(raw_html=html)
+
+        self.assertEqual(article.publish_date, "2025-04-05T12:30:00Z")
+
+    def test_publication_date_falls_back_to_json_ld(self):
+        html = """<html><head><title>Structured article</title>
+          <script type="application/ld+json">
+            {"@graph": [{"@type": "NewsArticle", "datePublished": "2025-06-07"}]}
+          </script>
+        </head><body><article>
+          <p>This sufficiently long paragraph supports extraction of structured metadata.</p>
+          <p>This second paragraph ensures the content pipeline continues normally.</p>
+        </article></body></html>"""
+
+        article = Goose({"enable_image_fetching": False}).extract(raw_html=html)
+
+        self.assertEqual(article.publish_date, "2025-06-07")
+
 
 class TestGooseLanguageSelection(TestCase):
     def test_metadata_language_is_used_for_content_scoring(self):
