@@ -1,6 +1,8 @@
 # coding=utf-8
 from collections import Counter
+from dataclasses import dataclass
 from math import fabs
+from math import isfinite
 import os
 from re import search as regex_search, sub as regex_sub, UNICODE as REGEX_UNICODE
 
@@ -80,6 +82,26 @@ _CONTEXTUAL_ABBREVIATIONS = {
 }
 
 
+@dataclass(frozen=True)
+class ScoringWeights:
+    """Non-negative weights for the summarizer's four sentence features."""
+
+    title: float = TITLE_WEIGHT
+    frequency: float = FREQUENCY_WEIGHT
+    length: float = LENGTH_WEIGHT
+    position: float = POSITION_WEIGHT
+
+    def __post_init__(self):
+        values = (self.title, self.frequency, self.length, self.position)
+        if any(isinstance(value, bool) or not isinstance(value, (int, float))
+               for value in values):
+            raise TypeError("scoring weights must be numeric")
+        if any(not isfinite(value) or value < 0 for value in values):
+            raise ValueError("scoring weights must be finite and non-negative")
+        if sum(values) == 0:
+            raise ValueError("at least one scoring weight must be positive")
+
+
 class PyTeaserError(Exception):
     """Base exception for URL article summarization failures."""
 
@@ -92,7 +114,8 @@ class ArticleExtractionError(PyTeaserError):
     """Raised when a fetched page does not yield an article."""
 
 
-def SummarizeUrl(url, sentence_count=5, language=None, max_words=None):
+def SummarizeUrl(url, sentence_count=5, language=None, max_words=None,
+                 weights=None):
     sentence_count = _validate_sentence_count(sentence_count)
     max_words = _validate_max_words(max_words)
     requested_language = (
@@ -130,10 +153,12 @@ def SummarizeUrl(url, sentence_count=5, language=None, max_words=None):
         sentence_count,
         language=requested_language,
         max_words=max_words,
+        weights=weights,
     )
 
 
-def Summarize(title, text, sentence_count=5, language="en", max_words=None):
+def Summarize(title, text, sentence_count=5, language="en", max_words=None,
+              weights=None):
     """Return an extractive summary for a title and article text.
 
     Text arguments may be strings or UTF-8 encoded bytes. A missing title is
@@ -160,7 +185,9 @@ def Summarize(title, text, sentence_count=5, language="en", max_words=None):
     # Rank each occurrence separately, select the best sentences, then restore
     # the article's original order for a coherent extractive summary.
     ranked = sorted(
-        score(sentences, titleWords, keys, language, active_stop_words),
+        score(
+            sentences, titleWords, keys, language, active_stop_words,
+            weights=weights),
         key=lambda result: (-result[2], result[0]),
     )
     selected = _select_non_redundant(
@@ -174,14 +201,16 @@ def Summarize(title, text, sentence_count=5, language="en", max_words=None):
     return [sentence for _, sentence, _ in selected]
 
 
-def summarize(title, text, sentence_count=5, language="en", max_words=None):
+def summarize(title, text, sentence_count=5, language="en", max_words=None,
+              weights=None):
     """PEP 8 spelling of :func:`Summarize`."""
-    return Summarize(title, text, sentence_count, language, max_words)
+    return Summarize(title, text, sentence_count, language, max_words, weights)
 
 
-def summarize_url(url, sentence_count=5, language=None, max_words=None):
+def summarize_url(url, sentence_count=5, language=None, max_words=None,
+                  weights=None):
     """PEP 8 spelling of :func:`SummarizeUrl`."""
-    return SummarizeUrl(url, sentence_count, language, max_words)
+    return SummarizeUrl(url, sentence_count, language, max_words, weights)
 
 
 def _coerce_text(value, name, allow_none=False):
@@ -249,6 +278,19 @@ def _validate_max_words(max_words):
     return max_words
 
 
+def _coerce_scoring_weights(weights):
+    if weights is None:
+        return ScoringWeights()
+    if isinstance(weights, dict):
+        try:
+            return ScoringWeights(**weights)
+        except TypeError as error:
+            raise TypeError("weights must define title, frequency, length, and position") from error
+    if not isinstance(weights, ScoringWeights):
+        raise TypeError("weights must be a ScoringWeights instance or a dict")
+    return weights
+
+
 def _select_non_redundant(
         ranked, sentence_count, threshold=0.8, language="en", stop_words=None,
         max_words=None):
@@ -300,10 +342,12 @@ def grab_link(inurl):
     return Goose().extract(url=inurl)
 
 
-def score(sentences, titleWords, keywords, language="en", stop_words=None):
+def score(sentences, titleWords, keywords, language="en", stop_words=None,
+          weights=None):
     """Return ``(index, sentence, score)`` for every sentence occurrence."""
     if stop_words is None:
         stop_words = _load_stop_words(language)
+    weights = _coerce_scoring_weights(weights)
     senSize = len(sentences)
     ranks = []
     for i, s in enumerate(sentences):
@@ -315,13 +359,13 @@ def score(sentences, titleWords, keywords, language="en", stop_words=None):
         dbsFeature = dbs(sentence, keywords)
         frequency = (sbsFeature + dbsFeature) / 2.0 * 10.0
 
-        totalWeight = (
-            TITLE_WEIGHT + FREQUENCY_WEIGHT + LENGTH_WEIGHT + POSITION_WEIGHT)
+        totalWeight = sum((
+            weights.title, weights.frequency, weights.length, weights.position))
         totalScore = (
-            titleFeature * TITLE_WEIGHT
-            + frequency * FREQUENCY_WEIGHT
-            + sentenceLength * LENGTH_WEIGHT
-            + sentencePosition * POSITION_WEIGHT
+            titleFeature * weights.title
+            + frequency * weights.frequency
+            + sentenceLength * weights.length
+            + sentencePosition * weights.position
         ) / totalWeight
         ranks.append((i, s, totalScore))
     return ranks
