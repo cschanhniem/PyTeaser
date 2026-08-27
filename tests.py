@@ -35,6 +35,7 @@ from goose.videos.extractors import VideoExtractor
 from pyteaser import (
     ArticleExtractionError,
     ArticleFetchError,
+    ScoringWeights,
     Summarize,
     SummarizeUrl,
     keywords,
@@ -131,6 +132,28 @@ class TestSummarize(TestCase):
             Summarize("Title", "Some words here.", max_words=1.5)
         with self.assertRaisesRegex(TypeError, "max_words"):
             Summarize("Title", "Some words here.", max_words=True)
+
+    def test_custom_scoring_weights_are_supported(self):
+        ranked = score(
+            ["Topic drives the result.", "Other facts matter."],
+            ["topic"],
+            {},
+            weights=ScoringWeights(
+                title=1.0, frequency=0.0, length=0.0, position=0.0),
+        )
+
+        self.assertEqual(ranked[0][2], 1.0)
+        self.assertEqual(ranked[1][2], 0.0)
+
+    def test_invalid_scoring_weights_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "non-negative"):
+            ScoringWeights(title=-1.0)
+        with self.assertRaisesRegex(ValueError, "positive"):
+            ScoringWeights(title=0, frequency=0, length=0, position=0)
+        with self.assertRaisesRegex(TypeError, "numeric"):
+            ScoringWeights(title=True)
+        with self.assertRaisesRegex(TypeError, "title, frequency"):
+            Summarize("Title", "Article text.", weights={"unknown": 1})
 
     def test_sentence_splitter_handles_lowercase_starts_and_quotes(self):
         self.assertEqual(
