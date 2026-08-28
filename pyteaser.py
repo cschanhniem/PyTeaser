@@ -102,6 +102,15 @@ class ScoringWeights:
             raise ValueError("at least one scoring weight must be positive")
 
 
+@dataclass(frozen=True)
+class ScoredSentence:
+    """A selected sentence and its source index and overall ranking score."""
+
+    index: int
+    sentence: str
+    score: float
+
+
 class PyTeaserError(Exception):
     """Base exception for URL article summarization failures."""
 
@@ -165,6 +174,16 @@ def Summarize(title, text, sentence_count=5, language="en", max_words=None,
     treated as an empty string; blank article text produces an empty summary.
     ``language`` selects tokenization and bundled stopwords.
     """
+    return [
+        result.sentence
+        for result in summarize_detailed(
+            title, text, sentence_count, language, max_words, weights)
+    ]
+
+
+def summarize_detailed(title, text, sentence_count=5, language="en",
+                       max_words=None, weights=None):
+    """Return selected sentences with their source indices and scores."""
     sentence_count = _validate_sentence_count(sentence_count)
     max_words = _validate_max_words(max_words)
     language = _normalize_language(language)
@@ -198,7 +217,8 @@ def Summarize(title, text, sentence_count=5, language="en", max_words=None,
         max_words=max_words,
     )
     selected.sort(key=lambda result: result[0])
-    return [sentence for _, sentence, _ in selected]
+    return [ScoredSentence(index, sentence, score)
+            for index, sentence, score in selected]
 
 
 def summarize(title, text, sentence_count=5, language="en", max_words=None,
