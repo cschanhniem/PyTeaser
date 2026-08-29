@@ -44,6 +44,7 @@ from pyteaser import (
     split_sentences,
     split_words,
     summarize,
+    summarize_detailed,
     summarize_url,
     stopWords,
     title_score,
@@ -144,6 +145,25 @@ class TestSummarize(TestCase):
 
         self.assertEqual(ranked[0][2], 1.0)
         self.assertEqual(ranked[1][2], 0.0)
+
+    def test_detailed_summary_reports_source_indices_and_scores(self):
+        title = "Research results"
+        text = (
+            "Researchers announced detailed results today. "
+            "Experts reviewed the independent evidence. "
+            "The study has several important implications. "
+            "More research is needed next year."
+        )
+
+        details = summarize_detailed(title, text, sentence_count=2)
+
+        self.assertEqual(len(details), 2)
+        self.assertTrue(all(isinstance(result.index, int) for result in details))
+        self.assertTrue(all(isinstance(result.score, float) for result in details))
+        self.assertEqual([result.sentence for result in details],
+                         Summarize(title, text, sentence_count=2))
+        self.assertEqual([result.index for result in details],
+                         sorted(result.index for result in details))
 
     def test_invalid_scoring_weights_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "non-negative"):
