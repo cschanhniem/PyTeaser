@@ -1,0 +1,12 @@
+PyTeaser is distributed with material under more than one license.
+
+The project-specific PyTeaser code is distributed under the MIT License; see
+LICENSE.
+
+The bundled Goose article-extraction port is distributed under the Apache
+License, Version 2.0; see goose/LICENSE.txt. Its source headers identify
+Xavier Grangier as the Python port author for Recrutae and Gravity.com as the
+Apache-2.0 licensor. Those headers have been retained in the source files.
+
+The bundled French stopword resource includes the Apache Software Foundation
+attribution and license notice in goose/resources/text/stopwords-fr.txt.
