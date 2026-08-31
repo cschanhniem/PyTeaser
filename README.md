@@ -83,4 +83,4 @@ python -m unittest discover -v
 
 ## License
 
-PyTeaser's original code is MIT-licensed. The bundled Goose article extractor is Apache-2.0-licensed; see `LICENSE` and `goose/LICENSE.txt`.
+PyTeaser's original code is MIT-licensed. The bundled Goose article extractor and its included resources are Apache-2.0-licensed; see `LICENSE`, `goose/LICENSE.txt`, and `NOTICE` for license and attribution details.
