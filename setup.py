@@ -11,8 +11,8 @@ setup(
     description="Extractive summaries and article text extraction",
     long_description=(ROOT / "README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
-    license="MIT",
-    license_files=["LICENSE", "goose/LICENSE.txt"],
+    license="MIT AND Apache-2.0",
+    license_files=["LICENSE", "goose/LICENSE.txt", "NOTICE"],
     python_requires=">=3.10",
     install_requires=[
         "lxml>=5.0",
