@@ -77,12 +77,22 @@ class ContentExtractor(object):
         doc = article.doc
 
         title_element = self.parser.getElementsByTag(doc, tag='title')
-        # no title found
-        if title_element is None or len(title_element) == 0:
+        title_text = (
+            self.parser.getText(title_element[0])
+            if title_element else "")
+        if not title_text:
+            for selector in (
+                    "meta[property='og:title']",
+                    "meta[name='twitter:title']",
+                    "meta[itemprop='headline']"):
+                title_text = self.get_meta_content(doc, selector)
+                if title_text:
+                    break
+        if not title_text:
+            title_text = self.get_jsonld_headline(doc) or ""
+        if not title_text:
             return title
 
-        # title elem found
-        title_text = self.parser.getText(title_element[0])
         used_delimeter = False
 
         # split title with |
@@ -107,6 +117,35 @@ class ContentExtractor(object):
 
         title = MOTLEY_REPLACEMENT.replaceAll(title_text)
         return title
+
+    def get_jsonld_headline(self, document):
+        scripts = self.parser.css_select(
+            document, "script[type='application/ld+json']")
+        for script in scripts:
+            try:
+                structured_data = json.loads("".join(script.itertext()))
+            except (TypeError, ValueError):
+                continue
+            headline = self._find_structured_headline(structured_data)
+            if headline:
+                return headline
+        return ""
+
+    def _find_structured_headline(self, value):
+        if isinstance(value, dict):
+            headline = value.get("headline")
+            if isinstance(headline, str) and headline.strip():
+                return headline.strip()
+            for nested_value in value.values():
+                headline = self._find_structured_headline(nested_value)
+                if headline:
+                    return headline
+        elif isinstance(value, list):
+            for nested_value in value:
+                headline = self._find_structured_headline(nested_value)
+                if headline:
+                    return headline
+        return None
 
     def split_title(self, title, splitter):
         """\
