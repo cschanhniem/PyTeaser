@@ -172,7 +172,7 @@ class UpgradedImageIExtractor(ImageExtractor):
         cnt = float(1.0)
         MIN_WIDTH = 50
         for image in images[:30]:
-            src = self.parser.getAttribute(image, attr='src')
+            src = self.get_image_src(image)
             src = self.build_image_path(src)
             local_image = self.get_local_image(src)
             if local_image is None:
@@ -265,7 +265,7 @@ class UpgradedImageIExtractor(ImageExtractor):
         will check the image src against a list
         of bad image files we know of like buttons, etc...
         """
-        src = self.parser.getAttribute(imageNode, attr='src')
+        src = self.get_image_src(imageNode)
 
         if not src:
             return False
@@ -274,6 +274,37 @@ class UpgradedImageIExtractor(ImageExtractor):
             return False
 
         return True
+
+    def get_image_src(self, image_node):
+        """Return the best available regular or lazy-loaded image URL."""
+        for attr in ("data-srcset", "srcset"):
+            srcset = self.parser.getAttribute(image_node, attr=attr)
+            if not srcset or srcset.lstrip().lower().startswith("data:"):
+                continue
+
+            candidates = []
+            for candidate in srcset.split(","):
+                parts = candidate.strip().split()
+                if not parts or parts[0].lower().startswith("data:"):
+                    continue
+                rank = 0.0
+                if len(parts) > 1:
+                    match = re.match(r"^(\d+(?:\.\d+)?)(w|x)$", parts[1])
+                    if match:
+                        rank = float(match.group(1))
+                        if match.group(2) == "x":
+                            rank *= 1000
+                candidates.append((rank, parts[0]))
+            if candidates:
+                return max(candidates, key=lambda candidate: candidate[0])[1]
+
+        for attr in (
+                "data-src", "data-lazy-src", "data-original-src",
+                "data-original", "data-url", "src"):
+            src = self.parser.getAttribute(image_node, attr=attr)
+            if src and not src.strip().lower().startswith("data:"):
+                return src.strip()
+        return None
 
     def get_image_candidates(self, node):
         good_images = []
@@ -296,7 +327,7 @@ class UpgradedImageIExtractor(ImageExtractor):
             if cnt >= 30:
                 return good_images
             cnt += 1
-            src = self.parser.getAttribute(image, attr='src')
+            src = self.get_image_src(image)
             src = self.build_image_path(src)
             local_image = self.get_local_image(src)
             if local_image is None:
@@ -385,7 +416,7 @@ class UpgradedImageIExtractor(ImageExtractor):
             elements = self.parser.getElementsByTag(doc, attr="id", value=css)
             image = _check_elements(elements)
             if image is not None:
-                src = self.parser.getAttribute(image, attr='src')
+                src = self.get_image_src(image)
                 if src:
                     return self.get_image(image, src, score=90, extraction_type='known')
 
@@ -394,7 +425,7 @@ class UpgradedImageIExtractor(ImageExtractor):
             elements = self.parser.getElementsByTag(doc, attr='class', value=css)
             image = _check_elements(elements)
             if image is not None:
-                src = self.parser.getAttribute(image, attr='src')
+                src = self.get_image_src(image)
                 if src:
                     return self.get_image(image, src, score=90, extraction_type='known')
 
