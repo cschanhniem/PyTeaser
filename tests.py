@@ -463,6 +463,32 @@ class TestGooseExtraction(TestCase):
 
         self.assertEqual(article.publish_date, "2025-06-07")
 
+    def test_open_graph_title_is_used_when_document_title_is_missing(self):
+        html = """<html><head>
+          <meta property="og:title" content="Open Graph article title">
+        </head><body><article>
+          <p>This sufficiently long paragraph allows Goose to extract the article body.</p>
+          <p>This second paragraph continues to provide meaningful article content.</p>
+        </article></body></html>"""
+
+        article = Goose({"enable_image_fetching": False}).extract(raw_html=html)
+
+        self.assertEqual(article.title, "Open Graph article title")
+
+    def test_json_ld_headline_is_used_when_document_title_is_missing(self):
+        html = """<html><head>
+          <script type="application/ld+json">
+            {"@type":"NewsArticle","headline":"Structured article headline"}
+          </script>
+        </head><body><article>
+          <p>This sufficiently long paragraph allows Goose to extract the article body.</p>
+          <p>This second paragraph continues to provide meaningful article content.</p>
+        </article></body></html>"""
+
+        article = Goose({"enable_image_fetching": False}).extract(raw_html=html)
+
+        self.assertEqual(article.title, "Structured article headline")
+
 
 class TestGooseLanguageSelection(TestCase):
     def test_metadata_language_is_used_for_content_scoring(self):
