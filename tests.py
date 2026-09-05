@@ -615,6 +615,19 @@ class TestImageExtraction(TestCase):
         image_details.set_mime_type("WEBP")
         self.assertEqual(ImageUtils.get_mime_type(image_details), ".webp")
 
+    def test_lazy_image_and_srcset_urls_are_supported(self):
+        document = Parser.fromstring("""<html><body>
+          <img src="/placeholder.gif" data-src="/lazy.jpg"
+               srcset="/small.jpg 320w, /large.jpg 2x">
+          <img data-src="data:image/png;base64,AAAA">
+        </body></html>""")
+        image_nodes = Parser.getElementsByTag(document, tag="img")
+
+        self.assertEqual(
+            self.extractor.get_image_src(image_nodes[0]), "/large.jpg")
+        self.assertTrue(self.extractor.is_valid_filename(image_nodes[0]))
+        self.assertIsNone(self.extractor.get_image_src(image_nodes[1]))
+
 
 class TestVideoExtraction(TestCase):
     def test_html5_video_source_is_extracted_and_made_absolute(self):
