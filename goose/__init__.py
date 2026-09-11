@@ -22,7 +22,8 @@ limitations under the License.
 """
 import os
 import tempfile
-from goose.version import version_info, __version__
+from goose.version import __version__ as __version__
+from goose.version import version_info as version_info
 from goose.configuration import Configuration
 from goose.crawler import CrawlCandidate
 from goose.crawler import Crawler
