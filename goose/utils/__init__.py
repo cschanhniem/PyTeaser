@@ -37,7 +37,7 @@ class BuildURL(object):
         if o.hostname:
             return o.hostname
         elif self.finalurl:
-            oo = urlparse(self.finalurl)
+            oo = urlparse.urlparse(self.finalurl)
             if oo.hostname:
                 return oo.hostname
         return None
@@ -46,7 +46,7 @@ class BuildURL(object):
         if o.scheme:
             return o.scheme
         elif self.finalurl:
-            oo = urlparse(self.finalurl)
+            oo = urlparse.urlparse(self.finalurl)
             if oo.scheme:
                 return oo.scheme
         return 'http'
@@ -55,9 +55,27 @@ class BuildURL(object):
         """\
 
         """
-        url_obj = urlparse(self.url)
+        candidate = (
+            urlparse.urljoin(self.finalurl, self.url)
+            if self.finalurl else self.url
+        )
+        url_obj = urlparse.urlparse(candidate)
         scheme = self.getScheme(url_obj)
         hostname = self.getHostname(url_obj)
+        if not hostname:
+            return None
+
+        netloc = url_obj.netloc or hostname
+        if not url_obj.netloc and url_obj.port:
+            netloc = "%s:%s" % (hostname, url_obj.port)
+        return urlparse.urlunparse((
+            scheme,
+            netloc,
+            url_obj.path,
+            url_obj.params,
+            url_obj.query,
+            url_obj.fragment,
+        ))
 
 
 class FileHelper(object):
