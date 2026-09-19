@@ -23,6 +23,7 @@ setup(
         "chinese": ["jieba>=0.42.1"],
         "soup": ["beautifulsoup4>=4.12"],
         "all": ["Pillow>=10", "jieba>=0.42.1", "beautifulsoup4>=4.12"],
+        "dev": ["ruff>=0.16,<1"],
     },
     packages=find_packages(),
     py_modules=["pyteaser"],
