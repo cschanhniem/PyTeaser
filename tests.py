@@ -31,6 +31,7 @@ from goose.network import (
 )
 from goose.parsers import Parser
 from goose.text import StopWords, StopWordsChinese, stopwords_class_for_language
+from goose.utils import BuildURL
 from goose.videos.extractors import VideoExtractor
 from pyteaser import (
     ArticleExtractionError,
@@ -537,6 +538,20 @@ class TestGooseInitialization(TestCase):
             self.assertEqual(len(instances), 16)
             self.assertTrue(os.path.isdir(storage_path))
             self.assertFalse(os.path.exists(os.path.join(storage_path, "test.txt")))
+
+
+class TestURLHelpers(TestCase):
+    def test_build_url_resolves_relative_path(self):
+        self.assertEqual(
+            BuildURL("media/report.mp4", "https://news.example/world/story").getUrl(),
+            "https://news.example/world/media/report.mp4",
+        )
+
+    def test_build_url_keeps_absolute_url(self):
+        self.assertEqual(
+            BuildURL("https://cdn.example/media.mp4").getUrl(),
+            "https://cdn.example/media.mp4",
+        )
 
 
 class TestImageExtraction(TestCase):
