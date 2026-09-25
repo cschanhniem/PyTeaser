@@ -40,6 +40,16 @@ Scoring weights default to title `1.5`, keyword frequency `2.0`, length `1.0`, a
 
 For score inspection, `summarize_detailed(...)` returns records with each selected sentence's original `index`, text in `sentence`, and overall `score`. The normal APIs continue to return plain strings.
 
+## Command line
+
+After installation, summarize text or a UTF-8 file:
+
+```bash
+pyteaser --title "Example article" --text "First sentence. Second sentence." --sentence-count 1
+pyteaser --input-file article.txt --title "Example article" --max-words 120
+pyteaser --url "https://example.com/news/article" --sentence-count 3
+```
+
 The original `Summarize(title, text)` function remains available. Both APIs return a list of sentence strings.
 
 ## Summarize a URL
