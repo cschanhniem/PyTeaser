@@ -1,9 +1,11 @@
 # coding=utf-8
+import argparse
 from collections import Counter
 from dataclasses import dataclass
 from math import fabs
 from math import isfinite
 import os
+from pathlib import Path
 from re import search as regex_search, sub as regex_sub, UNICODE as REGEX_UNICODE
 
 stopWords = set([
@@ -219,6 +221,46 @@ def summarize_detailed(title, text, sentence_count=5, language="en",
     selected.sort(key=lambda result: result[0])
     return [ScoredSentence(index, sentence, score)
             for index, sentence, score in selected]
+
+
+def main(argv=None):
+    """Command-line entry point for summarizing text, files, or URLs."""
+    parser = argparse.ArgumentParser(description="Create an extractive summary")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--url", help="article URL to fetch and summarize")
+    source.add_argument("--text", help="article text to summarize")
+    source.add_argument(
+        "--input-file", type=Path, help="UTF-8 text file containing the article")
+    parser.add_argument("--title", default=None, help="article title for text input")
+    parser.add_argument("--sentence-count", type=int, default=5)
+    parser.add_argument("--max-words", type=int, default=None)
+    parser.add_argument("--language", default=None, help="language code such as en or es")
+    args = parser.parse_args(argv)
+
+    try:
+        if args.url:
+            summary = summarize_url(
+                args.url,
+                sentence_count=args.sentence_count,
+                language=args.language,
+                max_words=args.max_words,
+            )
+        else:
+            text = args.text if args.text is not None else args.input_file.read_text(
+                encoding="utf-8")
+            summary = summarize(
+                args.title,
+                text,
+                sentence_count=args.sentence_count,
+                language=args.language or "en",
+                max_words=args.max_words,
+            )
+    except (PyTeaserError, OSError, TypeError, ValueError) as error:
+        parser.exit(2, "pyteaser: %s\n" % error)
+
+    for sentence in summary:
+        print(sentence)
+    return 0
 
 
 def summarize(title, text, sentence_count=5, language="en", max_words=None,
