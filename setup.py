@@ -32,6 +32,7 @@ setup(
     author="Xiao Xu",
     author_email="xx56@cornell.edu",
     url="https://github.com/xiaoxu193/PyTeaser",
+    entry_points={"console_scripts": ["pyteaser=pyteaser:main"]},
     classifiers=[
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3 :: Only",
