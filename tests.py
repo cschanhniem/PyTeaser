@@ -3,9 +3,11 @@
 import socket
 import os
 import tempfile
+from contextlib import redirect_stderr, redirect_stdout
 from concurrent.futures import ThreadPoolExecutor
 from importlib.util import find_spec
 from io import BytesIO
+from io import StringIO
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from types import ModuleType, SimpleNamespace
@@ -41,6 +43,7 @@ from pyteaser import (
     SummarizeUrl,
     keywords,
     length_score,
+    main,
     score,
     split_sentences,
     split_words,
@@ -165,6 +168,37 @@ class TestSummarize(TestCase):
                          Summarize(title, text, sentence_count=2))
         self.assertEqual([result.index for result in details],
                          sorted(result.index for result in details))
+
+    def test_cli_summarizes_text_and_input_files(self):
+        text_output = StringIO()
+        with redirect_stdout(text_output):
+            status = main([
+                "--title", "CLI example",
+                "--text", "One sentence. Two sentence.",
+                "--sentence-count", "1",
+            ])
+        self.assertEqual(status, 0)
+        self.assertEqual(len(text_output.getvalue().strip().splitlines()), 1)
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            article_file = os.path.join(temporary_directory, "article.txt")
+            with open(article_file, "w", encoding="utf-8") as source:
+                source.write("File sentence one. File sentence two.")
+            file_output = StringIO()
+            with redirect_stdout(file_output):
+                status = main(["--input-file", article_file, "--max-words", "3"])
+
+        self.assertEqual(status, 0)
+        self.assertTrue(file_output.getvalue().strip())
+
+    def test_cli_reports_url_errors_without_a_traceback(self):
+        error_output = StringIO()
+        with redirect_stderr(error_output):
+            with self.assertRaises(SystemExit) as error:
+                main(["--url", "file:///etc/passwd"])
+
+        self.assertEqual(error.exception.code, 2)
+        self.assertIn("Could not fetch", error_output.getvalue())
 
     def test_invalid_scoring_weights_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "non-negative"):
